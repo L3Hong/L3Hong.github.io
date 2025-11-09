@@ -357,33 +357,43 @@
                 return `https://archive.org/download/ps4-fpkg-collection-english-g/${encodedFilename}`;
             }
             
-            // Try different icon sources
+            // Get correct icon URL
             function getIconUrl(game) {
-                // Try multiple possible icon locations
-                const iconUrls = [
-                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.content_id}.png`,
-                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.content_id}.jpg`,
-                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.title.replace(/[^a-zA-Z0-9]/g, '')}.png`,
-                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.title.replace(/[^a-zA-Z0-9]/g, '')}.jpg`
+                // Extract CUSA ID from content_id
+                const cusaMatch = game.content_id.match(/CUSA\d+/);
+                if (cusaMatch) {
+                    const cusaId = cusaMatch[0];
+                    return [
+                        `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}.png`,
+                        `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`
+                    ];
+                }
+                return [];
+            }
+            
+            // Fast fetch with multiple fallback options
+            async function loadGameData() {
+                const proxies = [
+                    'https://api.allorigins.win/raw?url=',
+                    'https://corsproxy.io/?',
+                    'https://api.cors.link/',
+                    '' // Try direct fetch (might work in some environments)
                 ];
                 
-                return iconUrls;
-            }
-            
-            // Try to fetch the actual data
-            function loadGameData() {
-                // Using a CORS proxy to bypass CORS restrictions
-                const proxyUrl = 'https://api.allorigins.win/raw?url=';
                 const targetUrl = 'https://dn721605.ca.archive.org/0/items/ps4-fpkg-collection-english-fpkgi/GAMES.json';
                 
-                fetch(proxyUrl + encodeURIComponent(targetUrl))
-                    .then(response => {
+                for (let proxy of proxies) {
+                    try {
+                        console.log(`Trying proxy: ${proxy}`);
+                        const response = await fetchWithTimeout(proxy + encodeURIComponent(targetUrl), 10000);
+                        
                         if (!response.ok) {
-                            throw new Error('Network response was not ok');
+                            throw new Error(`HTTP error! status: ${response.status}`);
                         }
-                        return response.json();
-                    })
-                    .then(data => {
+                        
+                        const data = await response.json();
+                        console.log(`Successfully loaded ${data.length} games using proxy: ${proxy}`);
+                        
                         // Process the data to fix download links
                         games = data.map(game => {
                             return {
@@ -392,176 +402,73 @@
                                 pkg: getCorrectDownloadLink(game.pkg)
                             };
                         });
+                        
                         filteredGames = [...games];
                         displayGames();
-                    })
-                    .catch(error => {
-                        console.error('Error fetching game data with proxy:', error);
-                        // Try alternative approach - fetch from a different source
-                        tryAlternativeSource();
-                    });
+                        return;
+                    } catch (error) {
+                        console.warn(`Proxy ${proxy} failed:`, error.message);
+                        continue;
+                    }
+                }
+                
+                // If all proxies fail, use manual data
+                console.log('All proxies failed, using manual game list');
+                useManualGameList();
             }
             
-            // Try alternative source for game data
-            function tryAlternativeSource() {
-                // Try to fetch from a different endpoint or use a different proxy
-                const altProxyUrl = 'https://cors-anywhere.herokuapp.com/';
-                const targetUrl = 'https://dn721605.ca.archive.org/0/items/ps4-fpkg-collection-english-fpkgi/GAMES.json';
-                
-                fetch(altProxyUrl + targetUrl)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        // Process the data to fix download links
-                        games = data.map(game => {
-                            return {
-                                ...game,
-                                // Fix the download link
-                                pkg: getCorrectDownloadLink(game.pkg)
-                            };
-                        });
-                        filteredGames = [...games];
-                        displayGames();
-                    })
-                    .catch(error => {
-                        console.error('Error fetching game data with alternative proxy:', error);
-                        // Use manual game list as fallback
-                        useManualGameList();
-                    });
+            // Fetch with timeout
+            function fetchWithTimeout(url, timeout = 8000) {
+                return Promise.race([
+                    fetch(url),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Request timeout')), timeout)
+                    )
+                ]);
             }
             
             // Use a manually created game list as fallback
             function useManualGameList() {
-                console.log('Using manual game list');
-                // Create a more comprehensive list of games
-                games = [
+                // We'll try to fetch a smaller subset first, then expand
+                const essentialGames = [
                     {
                         title: "GONNER2",
                         pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/GONNER2%20-%20%5BUS%5D%20%5BEN%5D%20%5B1.00%5D.pkg",
                         content_id: "UP0000-CUSA00000_00-GONNER200000000",
                         region: "USA"
-                    },
-                    {
-                        title: "The Last of Us Remastered",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/The.Last.of.Us.Remastered.pkg",
-                        content_id: "UP9000-CUSA00552_00-THELASTOFUS00000",
-                        region: "USA"
-                    },
-                    {
-                        title: "God of War",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/God.of.War.pkg",
-                        content_id: "UP9000-CUSA07408_00-GODOFWAR0000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Horizon Zero Dawn",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Horizon.Zero.Dawn.pkg",
-                        content_id: "UP9000-CUSA07319_00-HORIZONZERODOWN0",
-                        region: "EUR"
-                    },
-                    {
-                        title: "Spider-Man",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Spider-Man.pkg",
-                        content_id: "UP9000-CUSA02299_00-MARVELSSPIDERMAN",
-                        region: "USA"
-                    },
-                    {
-                        title: "Uncharted 4: A Thief's End",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Uncharted.4.pkg",
-                        content_id: "UP9000-CUSA00333_00-UNCHARTED4000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Bloodborne",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Bloodborne.pkg",
-                        content_id: "UP9000-CUSA00900_00-BLOODBORNE000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Persona 5",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Persona.5.pkg",
-                        content_id: "UP9000-CUSA06638_00-PERSONA500000000",
-                        region: "JPN"
-                    },
-                    {
-                        title: "Final Fantasy VII Remake",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/FFVII.Remake.pkg",
-                        content_id: "UP9000-CUSA07187_00-FFVIIREMAKE00000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Red Dead Redemption 2",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Red.Dead.Redemption.2.pkg",
-                        content_id: "UP9000-CUSA08519_00-REDEMPTION200000",
-                        region: "USA"
-                    },
-                    {
-                        title: "The Witcher 3: Wild Hunt",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/The.Witcher.3.pkg",
-                        content_id: "UP9000-CUSA05725_00-THEWITCHER30000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Death Stranding",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Death.Stranding.pkg",
-                        content_id: "UP9000-CUSA07802_00-DEATHSTRANDING00",
-                        region: "USA"
-                    },
-                    {
-                        title: "Cyberpunk 2077",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Cyberpunk.2077.pkg",
-                        content_id: "UP9000-CUSA16579_00-CYBERPUNK2077000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Ghost of Tsushima",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Ghost.of.Tsushima.pkg",
-                        content_id: "UP9000-CUSA13323_00-GHOSTOFFTSUSHIMA0",
-                        region: "USA"
-                    },
-                    {
-                        title: "Demon's Souls",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Demons.Souls.pkg",
-                        content_id: "UP9000-CUSA07864_00-DEMONSSOULS00000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Resident Evil 2",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Resident.Evil.2.pkg",
-                        content_id: "UP9000-CUSA09171_00-BH2R000000000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Resident Evil 3",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Resident.Evil.3.pkg",
-                        content_id: "UP9000-CUSA14090_00-BH3R000000000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Resident Evil 7",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Resident.Evil.7.pkg",
-                        content_id: "UP9000-CUSA03982_00-BIOHAZARD7000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Resident Evil Village",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Resident.Evil.Village.pkg",
-                        content_id: "UP9000-CUSA19502_00-RE8FULLGAME00000",
-                        region: "USA"
-                    },
-                    {
-                        title: "DOOM Eternal",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/DOOM.Eternal.pkg",
-                        content_id: "UP9000-CUSA12384_00-DOOMETERNAL00000",
-                        region: "USA"
                     }
                 ];
+                
+                games = essentialGames;
                 filteredGames = [...games];
                 displayGames();
+                
+                // Try to load more games in the background
+                loadAdditionalGames();
+            }
+            
+            // Try to load additional games
+            async function loadAdditionalGames() {
+                try {
+                    // Try to fetch from a different endpoint or use a different approach
+                    const response = await fetch('https://corsproxy.io/?' + encodeURIComponent('https://dn721605.ca.archive.org/0/items/ps4-fpkg-collection-english-fpkgi/GAMES.json'));
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const newGames = data.map(game => ({
+                            ...game,
+                            pkg: getCorrectDownloadLink(game.pkg)
+                        }));
+                        
+                        // Add new games to existing list
+                        games = [...games, ...newGames];
+                        filteredGames = [...games];
+                        displayGames();
+                        console.log(`Added ${newGames.length} additional games`);
+                    }
+                } catch (error) {
+                    console.log('Could not load additional games:', error);
+                }
             }
             
             // Display games in the grid with pagination
@@ -588,8 +495,9 @@
                     // Get possible icon URLs
                     const iconUrls = getIconUrl(game);
                     
-                    gameCard.innerHTML = `
-                        <div class="game-image">
+                    let iconHTML = '';
+                    if (iconUrls.length > 0) {
+                        iconHTML = `
                             <img src="${iconUrls[0]}" alt="${game.title}" 
                                  onerror="
                                      this.onerror=null;
@@ -609,6 +517,14 @@
                                  "
                                  data-fallback='${JSON.stringify(iconUrls.slice(1))}'
                                  style="width: 100%; height: 100%; object-fit: cover;">
+                        `;
+                    } else {
+                        iconHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; padding: 10px; text-align: center; font-weight: bold; font-size: 1.1rem;">${game.title}</div>`;
+                    }
+                    
+                    gameCard.innerHTML = `
+                        <div class="game-image">
+                            ${iconHTML}
                         </div>
                         <div class="game-info">
                             <h3 class="game-title">${game.title}</h3>
