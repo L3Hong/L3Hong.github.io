@@ -126,12 +126,20 @@
             width: 100%;
             height: 180px;
             object-fit: cover;
-            background-color: #2d4059;
+            background: linear-gradient(135deg, #2d4059 0%, #435b7a 100%);
             display: flex;
             align-items: center;
             justify-content: center;
             color: #a0a0a0;
             font-size: 0.9rem;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .game-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
         
         .game-info {
@@ -208,6 +216,36 @@
             grid-column: 1 / -1;
         }
         
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+            gap: 10px;
+        }
+        
+        .pagination button {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        
+        .pagination button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .pagination button.active {
+            background: #e84545;
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
         footer {
             text-align: center;
             margin-top: 50px;
@@ -281,6 +319,12 @@
             <div class="loading">Loading game library...</div>
         </div>
         
+        <div id="pagination" class="pagination" style="display: none;">
+            <button id="prevPage" disabled>Previous</button>
+            <span id="pageInfo">Page 1 of 1</span>
+            <button id="nextPage" disabled>Next</button>
+        </div>
+        
         <footer>
             <p>PS4 Game Collection - For educational purposes only</p>
         </footer>
@@ -293,8 +337,15 @@
             const regionFilter = document.getElementById('regionFilter');
             const sortBy = document.getElementById('sortBy');
             const gameCount = document.getElementById('gameCount');
+            const pagination = document.getElementById('pagination');
+            const prevPageBtn = document.getElementById('prevPage');
+            const nextPageBtn = document.getElementById('nextPage');
+            const pageInfo = document.getElementById('pageInfo');
             
             let games = [];
+            let filteredGames = [];
+            let currentPage = 1;
+            const gamesPerPage = 20;
             
             // Function to extract filename from URL and create correct download link
             function getCorrectDownloadLink(pkgUrl) {
@@ -306,7 +357,20 @@
                 return `https://archive.org/download/ps4-fpkg-collection-english-g/${encodedFilename}`;
             }
             
-            // Try to fetch the actual data first, then fall back to sample data
+            // Try different icon sources
+            function getIconUrl(game) {
+                // Try multiple possible icon locations
+                const iconUrls = [
+                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.content_id}.png`,
+                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.content_id}.jpg`,
+                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.title.replace(/[^a-zA-Z0-9]/g, '')}.png`,
+                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.title.replace(/[^a-zA-Z0-9]/g, '')}.jpg`
+                ];
+                
+                return iconUrls;
+            }
+            
+            // Try to fetch the actual data
             function loadGameData() {
                 // Using a CORS proxy to bypass CORS restrictions
                 const proxyUrl = 'https://api.allorigins.win/raw?url=';
@@ -328,73 +392,192 @@
                                 pkg: getCorrectDownloadLink(game.pkg)
                             };
                         });
-                        displayGames(games);
+                        filteredGames = [...games];
+                        displayGames();
                     })
                     .catch(error => {
                         console.error('Error fetching game data with proxy:', error);
-                        // Fall back to sample data with correct download links
-                        console.log('Using sample data instead');
-                        games = [
-                            {
-                                title: "GONNER2",
-                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/GONNER2%20-%20%5BUS%5D%20%5BEN%5D%20%5B1.00%5D.pkg",
-                                content_id: "UP0000-CUSA00000_00-GONNER200000000",
-                                region: "USA"
-                            },
-                            {
-                                title: "The Last of Us Remastered",
-                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/The.Last.of.Us.Remastered.pkg",
-                                content_id: "UP9000-CUSA00552_00-THELASTOFUS00000",
-                                region: "USA"
-                            },
-                            {
-                                title: "God of War",
-                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/God.of.War.pkg",
-                                content_id: "UP9000-CUSA07408_00-GODOFWAR0000000",
-                                region: "USA"
-                            },
-                            {
-                                title: "Horizon Zero Dawn",
-                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Horizon.Zero.Dawn.pkg",
-                                content_id: "UP9000-CUSA07319_00-HORIZONZERODOWN0",
-                                region: "EUR"
-                            },
-                            {
-                                title: "Spider-Man",
-                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Spider-Man.pkg",
-                                content_id: "UP9000-CUSA02299_00-MARVELSSPIDERMAN",
-                                region: "USA"
-                            },
-                            {
-                                title: "Uncharted 4: A Thief's End",
-                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Uncharted.4.pkg",
-                                content_id: "UP9000-CUSA00333_00-UNCHARTED4000000",
-                                region: "USA"
-                            },
-                            {
-                                title: "Bloodborne",
-                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Bloodborne.pkg",
-                                content_id: "UP9000-CUSA00900_00-BLOODBORNE000000",
-                                region: "USA"
-                            },
-                            {
-                                title: "Persona 5",
-                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Persona.5.pkg",
-                                content_id: "UP9000-CUSA06638_00-PERSONA500000000",
-                                region: "JPN"
-                            }
-                        ];
-                        displayGames(games);
+                        // Try alternative approach - fetch from a different source
+                        tryAlternativeSource();
                     });
             }
             
-            // Display games in the grid
-            function displayGames(gamesToDisplay) {
-                if (gamesToDisplay.length === 0) {
+            // Try alternative source for game data
+            function tryAlternativeSource() {
+                // Try to fetch from a different endpoint or use a different proxy
+                const altProxyUrl = 'https://cors-anywhere.herokuapp.com/';
+                const targetUrl = 'https://dn721605.ca.archive.org/0/items/ps4-fpkg-collection-english-fpkgi/GAMES.json';
+                
+                fetch(altProxyUrl + targetUrl)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Process the data to fix download links
+                        games = data.map(game => {
+                            return {
+                                ...game,
+                                // Fix the download link
+                                pkg: getCorrectDownloadLink(game.pkg)
+                            };
+                        });
+                        filteredGames = [...games];
+                        displayGames();
+                    })
+                    .catch(error => {
+                        console.error('Error fetching game data with alternative proxy:', error);
+                        // Use manual game list as fallback
+                        useManualGameList();
+                    });
+            }
+            
+            // Use a manually created game list as fallback
+            function useManualGameList() {
+                console.log('Using manual game list');
+                // Create a more comprehensive list of games
+                games = [
+                    {
+                        title: "GONNER2",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/GONNER2%20-%20%5BUS%5D%20%5BEN%5D%20%5B1.00%5D.pkg",
+                        content_id: "UP0000-CUSA00000_00-GONNER200000000",
+                        region: "USA"
+                    },
+                    {
+                        title: "The Last of Us Remastered",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/The.Last.of.Us.Remastered.pkg",
+                        content_id: "UP9000-CUSA00552_00-THELASTOFUS00000",
+                        region: "USA"
+                    },
+                    {
+                        title: "God of War",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/God.of.War.pkg",
+                        content_id: "UP9000-CUSA07408_00-GODOFWAR0000000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Horizon Zero Dawn",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Horizon.Zero.Dawn.pkg",
+                        content_id: "UP9000-CUSA07319_00-HORIZONZERODOWN0",
+                        region: "EUR"
+                    },
+                    {
+                        title: "Spider-Man",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Spider-Man.pkg",
+                        content_id: "UP9000-CUSA02299_00-MARVELSSPIDERMAN",
+                        region: "USA"
+                    },
+                    {
+                        title: "Uncharted 4: A Thief's End",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Uncharted.4.pkg",
+                        content_id: "UP9000-CUSA00333_00-UNCHARTED4000000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Bloodborne",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Bloodborne.pkg",
+                        content_id: "UP9000-CUSA00900_00-BLOODBORNE000000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Persona 5",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Persona.5.pkg",
+                        content_id: "UP9000-CUSA06638_00-PERSONA500000000",
+                        region: "JPN"
+                    },
+                    {
+                        title: "Final Fantasy VII Remake",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/FFVII.Remake.pkg",
+                        content_id: "UP9000-CUSA07187_00-FFVIIREMAKE00000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Red Dead Redemption 2",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Red.Dead.Redemption.2.pkg",
+                        content_id: "UP9000-CUSA08519_00-REDEMPTION200000",
+                        region: "USA"
+                    },
+                    {
+                        title: "The Witcher 3: Wild Hunt",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/The.Witcher.3.pkg",
+                        content_id: "UP9000-CUSA05725_00-THEWITCHER30000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Death Stranding",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Death.Stranding.pkg",
+                        content_id: "UP9000-CUSA07802_00-DEATHSTRANDING00",
+                        region: "USA"
+                    },
+                    {
+                        title: "Cyberpunk 2077",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Cyberpunk.2077.pkg",
+                        content_id: "UP9000-CUSA16579_00-CYBERPUNK2077000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Ghost of Tsushima",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Ghost.of.Tsushima.pkg",
+                        content_id: "UP9000-CUSA13323_00-GHOSTOFFTSUSHIMA0",
+                        region: "USA"
+                    },
+                    {
+                        title: "Demon's Souls",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Demons.Souls.pkg",
+                        content_id: "UP9000-CUSA07864_00-DEMONSSOULS00000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Resident Evil 2",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Resident.Evil.2.pkg",
+                        content_id: "UP9000-CUSA09171_00-BH2R000000000000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Resident Evil 3",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Resident.Evil.3.pkg",
+                        content_id: "UP9000-CUSA14090_00-BH3R000000000000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Resident Evil 7",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Resident.Evil.7.pkg",
+                        content_id: "UP9000-CUSA03982_00-BIOHAZARD7000000",
+                        region: "USA"
+                    },
+                    {
+                        title: "Resident Evil Village",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Resident.Evil.Village.pkg",
+                        content_id: "UP9000-CUSA19502_00-RE8FULLGAME00000",
+                        region: "USA"
+                    },
+                    {
+                        title: "DOOM Eternal",
+                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/DOOM.Eternal.pkg",
+                        content_id: "UP9000-CUSA12384_00-DOOMETERNAL00000",
+                        region: "USA"
+                    }
+                ];
+                filteredGames = [...games];
+                displayGames();
+            }
+            
+            // Display games in the grid with pagination
+            function displayGames() {
+                if (filteredGames.length === 0) {
                     gamesContainer.innerHTML = '<div class="no-results">No games found matching your search.</div>';
                     gameCount.textContent = '0 games found';
+                    pagination.style.display = 'none';
                     return;
                 }
+                
+                // Calculate pagination
+                const totalPages = Math.ceil(filteredGames.length / gamesPerPage);
+                const startIndex = (currentPage - 1) * gamesPerPage;
+                const endIndex = Math.min(startIndex + gamesPerPage, filteredGames.length);
+                const gamesToDisplay = filteredGames.slice(startIndex, endIndex);
                 
                 gamesContainer.innerHTML = '';
                 
@@ -402,12 +585,30 @@
                     const gameCard = document.createElement('div');
                     gameCard.className = 'game-card';
                     
-                    // Create icon URL from content_id
-                    const iconUrl = `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.content_id}.png`;
+                    // Get possible icon URLs
+                    const iconUrls = getIconUrl(game);
                     
                     gameCard.innerHTML = `
                         <div class="game-image">
-                            <img src="${iconUrl}" alt="${game.title}" onerror="this.style.display='none'; this.parentNode.innerHTML='<div style=\\'display: flex; align-items: center; justify-content: center; height: 100%; padding: 10px; text-align: center;\\'>${game.title}</div>';" style="width: 100%; height: 100%; object-fit: cover;">
+                            <img src="${iconUrls[0]}" alt="${game.title}" 
+                                 onerror="
+                                     this.onerror=null;
+                                     let nextUrl = this.getAttribute('data-fallback');
+                                     if (nextUrl) {
+                                         this.src = nextUrl;
+                                     } else {
+                                         let fallbacks = ${JSON.stringify(iconUrls.slice(1))};
+                                         if (fallbacks.length > 0) {
+                                             this.src = fallbacks[0];
+                                             this.setAttribute('data-fallback', JSON.stringify(fallbacks.slice(1)));
+                                         } else {
+                                             this.style.display='none'; 
+                                             this.parentNode.innerHTML='<div style=\"display: flex; align-items: center; justify-content: center; height: 100%; padding: 10px; text-align: center; font-weight: bold; font-size: 1.1rem;\">${game.title}</div>';
+                                         }
+                                     }
+                                 "
+                                 data-fallback='${JSON.stringify(iconUrls.slice(1))}'
+                                 style="width: 100%; height: 100%; object-fit: cover;">
                         </div>
                         <div class="game-info">
                             <h3 class="game-title">${game.title}</h3>
@@ -421,7 +622,23 @@
                     gamesContainer.appendChild(gameCard);
                 });
                 
-                gameCount.textContent = `${gamesToDisplay.length} games found`;
+                gameCount.textContent = `${filteredGames.length} games found (showing ${startIndex + 1}-${endIndex})`;
+                
+                // Update pagination controls
+                updatePagination(totalPages);
+            }
+            
+            // Update pagination controls
+            function updatePagination(totalPages) {
+                if (totalPages <= 1) {
+                    pagination.style.display = 'none';
+                    return;
+                }
+                
+                pagination.style.display = 'flex';
+                prevPageBtn.disabled = currentPage === 1;
+                nextPageBtn.disabled = currentPage === totalPages;
+                pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
             }
             
             // Filter and search functionality
@@ -430,7 +647,7 @@
                 const region = regionFilter.value;
                 const sort = sortBy.value;
                 
-                let filteredGames = games.filter(game => 
+                filteredGames = games.filter(game => 
                     game.title.toLowerCase().includes(searchTerm) &&
                     (region === '' || game.region === region)
                 );
@@ -442,13 +659,30 @@
                     filteredGames.sort((a, b) => (a.region || '').localeCompare(b.region || ''));
                 }
                 
-                displayGames(filteredGames);
+                currentPage = 1; // Reset to first page when filtering
+                displayGames();
             }
             
             // Event listeners
             searchInput.addEventListener('input', filterGames);
             regionFilter.addEventListener('change', filterGames);
             sortBy.addEventListener('change', filterGames);
+            
+            // Pagination event listeners
+            prevPageBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    displayGames();
+                }
+            });
+            
+            nextPageBtn.addEventListener('click', () => {
+                const totalPages = Math.ceil(filteredGames.length / gamesPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    displayGames();
+                }
+            });
             
             // Initialize
             loadGameData();
