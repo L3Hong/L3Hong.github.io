@@ -347,36 +347,35 @@
             let currentPage = 1;
             const gamesPerPage = 20;
             
-            // Function to extract filename from URL and create correct download link
-            function getCorrectDownloadLink(pkgUrl) {
-                if (!pkgUrl) return '#';
+            // Function to create download link from game data
+            function getDownloadLink(game) {
+                if (!game.name || !game.region || !game.version) return '#';
                 
-                // Extract filename from the URL
-                const filename = pkgUrl.split('/').pop();
-                if (!filename) return '#';
+                // Format the filename based on the game data
+                const cleanName = game.name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
+                const region = game.region;
+                const version = game.version.replace('.', '');
                 
-                // Encode the filename for URL (handles spaces and special characters)
+                // Create filename similar to: "YAKUZA 0 - [EUR] [EN] [0105].pkg"
+                const filename = `${cleanName} - [${region}] [EN] [${version}].pkg`;
                 const encodedFilename = encodeURIComponent(filename);
-                // Return the correct download URL
+                
                 return `https://archive.org/download/ps4-fpkg-collection-english-g/${encodedFilename}`;
             }
             
             // Get correct icon URL
             function getIconUrl(game) {
-                if (!game.content_id) return [];
+                if (!game.title_id) return [];
                 
-                // Extract CUSA ID from content_id
-                const cusaMatch = game.content_id.match(/CUSA\d+/);
-                if (cusaMatch) {
-                    const cusaId = cusaMatch[0];
-                    return [
-                        `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}.png`,
-                        `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`,
-                        `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}.png`,
-                        `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`
-                    ];
-                }
-                return [];
+                // Use title_id as CUSA ID
+                const cusaId = game.title_id;
+                return [
+                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}.png`,
+                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`,
+                    `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}.png`,
+                    `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`,
+                    game.cover_url // Use the cover_url from the JSON if available
+                ].filter(url => url); // Remove empty URLs
             }
             
             // Load game data from the hosted JSON file
@@ -398,25 +397,18 @@
                     }
                     
                     // Convert the DATA object to an array of games
-                    games = Object.values(data.DATA).map(gameArray => {
-                        if (!Array.isArray(gameArray) || gameArray.length === 0) {
-                            console.warn('Invalid game array:', gameArray);
-                            return null;
-                        }
-                        
-                        const game = gameArray[0];
-                        if (!game || typeof game !== 'object') {
-                            console.warn('Invalid game data:', game);
-                            return null;
-                        }
-                        
-                        return {
-                            title: game.title || 'Unknown Title',
-                            pkg: getCorrectDownloadLink(game.pkg),
-                            content_id: game.content_id || '',
-                            region: game.region || 'Unknown'
-                        };
-                    }).filter(game => game !== null);
+                    games = Object.values(data.DATA)
+                        .filter(game => game && typeof game === 'object' && game.name)
+                        .map(game => {
+                            return {
+                                title: game.name || 'Unknown Title',
+                                pkg: getDownloadLink(game),
+                                content_id: game.title_id || '',
+                                region: game.region || 'Unknown',
+                                version: game.version || '',
+                                cover_url: game.cover_url || ''
+                            };
+                        });
                     
                     console.log(`Successfully processed ${games.length} games`);
                     
@@ -517,6 +509,7 @@
                         <h3 class="game-title">${game.title}</h3>
                         <div class="game-details">
                             <span class="game-region">${game.region}</span>
+                            <span>v${game.version}</span>
                         </div>
                         <a href="${game.pkg}" class="download-btn" target="_blank">Download</a>
                     `;
