@@ -371,14 +371,10 @@
                 return [];
             }
             
-            // Load game data from the JSON file
+            // Load game data directly from the JSON file
             async function loadGameData() {
                 try {
-                    // Using a simple CORS proxy to bypass restrictions
-                    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-                    const targetUrl = 'https://dn721605.ca.archive.org/0/items/ps4-fpkg-collection-english-fpkgi/GAMES.json';
-                    
-                    const response = await fetch(proxyUrl + targetUrl);
+                    const response = await fetch('https://archive.org/download/ps4-fpkg-collection-english-fpkgi/GAMES.json');
                     
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
