@@ -45,15 +45,22 @@
             margin: 0 auto;
         }
         
-        .search-container {
+        .controls {
             display: flex;
-            justify-content: center;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .search-container {
+            flex: 1;
+            min-width: 300px;
         }
         
         #searchInput {
             width: 100%;
-            max-width: 500px;
             padding: 12px 20px;
             border: none;
             border-radius: 50px;
@@ -71,6 +78,21 @@
         #searchInput:focus {
             outline: none;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .filter-container {
+            display: flex;
+            gap: 10px;
+        }
+        
+        #regionFilter, #sortBy {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 0.9rem;
+            backdrop-filter: blur(10px);
         }
         
         .stats {
@@ -203,6 +225,11 @@
             h1 {
                 font-size: 2.2rem;
             }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
         }
         
         @media (max-width: 480px) {
@@ -227,8 +254,23 @@
             <p class="subtitle">Browse and download PS4 game packages directly from the archive</p>
         </header>
         
-        <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Search for games by title...">
+        <div class="controls">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search for games by title...">
+            </div>
+            <div class="filter-container">
+                <select id="regionFilter">
+                    <option value="">All Regions</option>
+                    <option value="USA">USA</option>
+                    <option value="EUR">Europe</option>
+                    <option value="JPN">Japan</option>
+                    <option value="ASIA">Asia</option>
+                </select>
+                <select id="sortBy">
+                    <option value="title">Sort by Title</option>
+                    <option value="region">Sort by Region</option>
+                </select>
+            </div>
         </div>
         
         <div class="stats">
@@ -241,6 +283,7 @@
         
         <footer>
             <p>PS4 Game Collection - For educational purposes only</p>
+            <p>Note: This page uses sample data. To use with the actual archive, you may need to run this through a CORS proxy.</p>
         </footer>
     </div>
 
@@ -248,26 +291,89 @@
         document.addEventListener('DOMContentLoaded', function() {
             const gamesContainer = document.getElementById('gamesContainer');
             const searchInput = document.getElementById('searchInput');
+            const regionFilter = document.getElementById('regionFilter');
+            const sortBy = document.getElementById('sortBy');
             const gameCount = document.getElementById('gameCount');
             
             let games = [];
             
-            // Fetch the JSON data
-            fetch('https://dn721605.ca.archive.org/0/items/ps4-fpkg-collection-english-fpkgi/GAMES.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    games = data;
-                    displayGames(games);
-                })
-                .catch(error => {
-                    console.error('Error fetching game data:', error);
-                    gamesContainer.innerHTML = '<div class="error">Failed to load game data. Please try again later.</div>';
-                });
+            // Sample data to demonstrate the interface
+            const sampleGames = [
+                {
+                    title: "The Last of Us Remastered",
+                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/The.Last.of.Us.Remastered.pkg",
+                    content_id: "UP9000-CUSA00552_00-THELASTOFUS00000",
+                    region: "USA"
+                },
+                {
+                    title: "God of War",
+                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/God.of.War.pkg",
+                    content_id: "UP9000-CUSA07408_00-GODOFWAR0000000",
+                    region: "USA"
+                },
+                {
+                    title: "Horizon Zero Dawn",
+                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Horizon.Zero.Dawn.pkg",
+                    content_id: "UP9000-CUSA07319_00-HORIZONZERODOWN0",
+                    region: "EUR"
+                },
+                {
+                    title: "Spider-Man",
+                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Spider-Man.pkg",
+                    content_id: "UP9000-CUSA02299_00-MARVELSSPIDERMAN",
+                    region: "USA"
+                },
+                {
+                    title: "Uncharted 4: A Thief's End",
+                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Uncharted.4.pkg",
+                    content_id: "UP9000-CUSA00333_00-UNCHARTED4000000",
+                    region: "USA"
+                },
+                {
+                    title: "Bloodborne",
+                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Bloodborne.pkg",
+                    content_id: "UP9000-CUSA00900_00-BLOODBORNE000000",
+                    region: "USA"
+                },
+                {
+                    title: "Persona 5",
+                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Persona.5.pkg",
+                    content_id: "UP9000-CUSA06638_00-PERSONA500000000",
+                    region: "JPN"
+                },
+                {
+                    title: "Final Fantasy VII Remake",
+                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/FFVII.Remake.pkg",
+                    content_id: "UP9000-CUSA07187_00-FFVIIREMAKE00000",
+                    region: "USA"
+                }
+            ];
+            
+            // Try to fetch the actual data first, then fall back to sample data
+            function loadGameData() {
+                // Using a CORS proxy to bypass CORS restrictions
+                const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                const targetUrl = 'https://dn721605.ca.archive.org/0/items/ps4-fpkg-collection-english-fpkgi/GAMES.json';
+                
+                fetch(proxyUrl + encodeURIComponent(targetUrl))
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        games = data;
+                        displayGames(games);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching game data with proxy:', error);
+                        // Fall back to sample data
+                        console.log('Using sample data instead');
+                        games = sampleGames;
+                        displayGames(games);
+                    });
+            }
             
             // Display games in the grid
             function displayGames(gamesToDisplay) {
@@ -288,7 +394,7 @@
                     
                     gameCard.innerHTML = `
                         <div class="game-image">
-                            <img src="${iconUrl}" alt="${game.title}" onerror="this.style.display='none'; this.parentNode.innerHTML='Image not available';" style="width: 100%; height: 100%;">
+                            <img src="${iconUrl}" alt="${game.title}" onerror="this.style.display='none'; this.parentNode.innerHTML='<div style=\\'display: flex; align-items: center; justify-content: center; height: 100%;\\'>${game.title}</div>';" style="width: 100%; height: 100%; object-fit: cover;">
                         </div>
                         <div class="game-info">
                             <h3 class="game-title">${game.title}</h3>
@@ -305,14 +411,34 @@
                 gameCount.textContent = `${gamesToDisplay.length} games found`;
             }
             
-            // Search functionality
-            searchInput.addEventListener('input', function() {
-                const searchTerm = this.value.toLowerCase();
-                const filteredGames = games.filter(game => 
-                    game.title.toLowerCase().includes(searchTerm)
+            // Filter and search functionality
+            function filterGames() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const region = regionFilter.value;
+                const sort = sortBy.value;
+                
+                let filteredGames = games.filter(game => 
+                    game.title.toLowerCase().includes(searchTerm) &&
+                    (region === '' || game.region === region)
                 );
+                
+                // Sort games
+                if (sort === 'title') {
+                    filteredGames.sort((a, b) => a.title.localeCompare(b.title));
+                } else if (sort === 'region') {
+                    filteredGames.sort((a, b) => (a.region || '').localeCompare(b.region || ''));
+                }
+                
                 displayGames(filteredGames);
-            });
+            }
+            
+            // Event listeners
+            searchInput.addEventListener('input', filterGames);
+            regionFilter.addEventListener('change', filterGames);
+            sortBy.addEventListener('change', filterGames);
+            
+            // Initialize
+            loadGameData();
         });
     </script>
 </body>
