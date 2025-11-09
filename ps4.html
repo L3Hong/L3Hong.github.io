@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PS4 Game Download Library</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e6e6e6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            padding: 30px 0;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #2d4059;
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            color: #fff;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: #a0a0a0;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .search-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        #searchInput {
+            width: 100%;
+            max-width: 500px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        #searchInput::placeholder {
+            color: #b0b0b0;
+        }
+        
+        #searchInput:focus {
+            outline: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .stats {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            color: #a0a0a0;
+        }
+        
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+        
+        .game-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+        }
+        
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        
+        .game-image {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background-color: #2d4059;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+        
+        .game-info {
+            padding: 18px;
+        }
+        
+        .game-title {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #fff;
+            line-height: 1.3;
+            height: 3.2em;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+        
+        .game-details {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: #a0a0a0;
+        }
+        
+        .game-region {
+            background: #2d4059;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        
+        .download-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #e84545 0%, #c73636 100%);
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        
+        .download-btn:hover {
+            background: linear-gradient(135deg, #c73636 0%, #a82a2a 100%);
+            box-shadow: 0 5px 15px rgba(200, 54, 54, 0.4);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2rem;
+            color: #a0a0a0;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 50px;
+            color: #e84545;
+            font-size: 1.2rem;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 50px;
+            color: #a0a0a0;
+            font-size: 1.2rem;
+            grid-column: 1 / -1;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding: 20px;
+            color: #a0a0a0;
+            font-size: 0.9rem;
+            border-top: 1px solid #2d4059;
+        }
+        
+        @media (max-width: 768px) {
+            .games-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            }
+            
+            h1 {
+                font-size: 2.2rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .games-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .game-title {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>PS4 Game Download Library</h1>
+            <p class="subtitle">Browse and download PS4 game packages directly from the archive</p>
+        </header>
+        
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search for games by title...">
+        </div>
+        
+        <div class="stats">
+            <span id="gameCount">Loading games...</span>
+        </div>
+        
+        <div id="gamesContainer" class="games-grid">
+            <div class="loading">Loading game library...</div>
+        </div>
+        
+        <footer>
+            <p>PS4 Game Collection - For educational purposes only</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const gamesContainer = document.getElementById('gamesContainer');
+            const searchInput = document.getElementById('searchInput');
+            const gameCount = document.getElementById('gameCount');
+            
+            let games = [];
+            
+            // Fetch the JSON data
+            fetch('https://dn721605.ca.archive.org/0/items/ps4-fpkg-collection-english-fpkgi/GAMES.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    games = data;
+                    displayGames(games);
+                })
+                .catch(error => {
+                    console.error('Error fetching game data:', error);
+                    gamesContainer.innerHTML = '<div class="error">Failed to load game data. Please try again later.</div>';
+                });
+            
+            // Display games in the grid
+            function displayGames(gamesToDisplay) {
+                if (gamesToDisplay.length === 0) {
+                    gamesContainer.innerHTML = '<div class="no-results">No games found matching your search.</div>';
+                    gameCount.textContent = '0 games found';
+                    return;
+                }
+                
+                gamesContainer.innerHTML = '';
+                
+                gamesToDisplay.forEach(game => {
+                    const gameCard = document.createElement('div');
+                    gameCard.className = 'game-card';
+                    
+                    // Create icon URL from content_id
+                    const iconUrl = `https://archive.org/download/ps4-fpkg-collection-english-icons/${game.content_id}.png`;
+                    
+                    gameCard.innerHTML = `
+                        <div class="game-image">
+                            <img src="${iconUrl}" alt="${game.title}" onerror="this.style.display='none'; this.parentNode.innerHTML='Image not available';" style="width: 100%; height: 100%;">
+                        </div>
+                        <div class="game-info">
+                            <h3 class="game-title">${game.title}</h3>
+                            <div class="game-details">
+                                <span class="game-region">${game.region || 'Unknown'}</span>
+                            </div>
+                            <a href="${game.pkg}" class="download-btn" target="_blank">Download</a>
+                        </div>
+                    `;
+                    
+                    gamesContainer.appendChild(gameCard);
+                });
+                
+                gameCount.textContent = `${gamesToDisplay.length} games found`;
+            }
+            
+            // Search functionality
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const filteredGames = games.filter(game => 
+                    game.title.toLowerCase().includes(searchTerm)
+                );
+                displayGames(filteredGames);
+            });
+        });
+    </script>
+</body>
+</html>
