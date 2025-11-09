@@ -347,22 +347,6 @@
             let currentPage = 1;
             const gamesPerPage = 20;
             
-            // Function to create download link from game data
-            function getDownloadLink(game) {
-                if (!game.name || !game.region || !game.version) return '#';
-                
-                // Format the filename based on the game data
-                const cleanName = game.name.replace(/[^a-zA-Z0-9\s]/g, '').trim();
-                const region = game.region;
-                const version = game.version.replace('.', '');
-                
-                // Create filename similar to: "YAKUZA 0 - [EUR] [EN] [0105].pkg"
-                const filename = `${cleanName} - [${region}] [EN] [${version}].pkg`;
-                const encodedFilename = encodeURIComponent(filename);
-                
-                return `https://archive.org/download/ps4-fpkg-collection-english-g/${encodedFilename}`;
-            }
-            
             // Get correct icon URL
             function getIconUrl(game) {
                 if (!game.title_id) return [];
@@ -370,11 +354,11 @@
                 // Use title_id as CUSA ID
                 const cusaId = game.title_id;
                 return [
+                    game.cover_url, // Use the cover_url from the JSON first
                     `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}.png`,
                     `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`,
                     `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}.png`,
-                    `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`,
-                    game.cover_url // Use the cover_url from the JSON if available
+                    `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`
                 ].filter(url => url); // Remove empty URLs
             }
             
@@ -397,20 +381,28 @@
                     }
                     
                     // Convert the DATA object to an array of games
-                    games = Object.values(data.DATA)
-                        .filter(game => game && typeof game === 'object' && game.name)
-                        .map(game => {
+                    // Each key in DATA is the download URL, and the value is the game info
+                    games = Object.entries(data.DATA)
+                        .map(([downloadUrl, gameInfo]) => {
+                            if (!gameInfo || typeof gameInfo !== 'object' || !gameInfo.name) {
+                                console.warn('Invalid game data:', gameInfo);
+                                return null;
+                            }
+                            
                             return {
-                                title: game.name || 'Unknown Title',
-                                pkg: getDownloadLink(game),
-                                content_id: game.title_id || '',
-                                region: game.region || 'Unknown',
-                                version: game.version || '',
-                                cover_url: game.cover_url || ''
+                                title: gameInfo.name || 'Unknown Title',
+                                pkg: downloadUrl, // Use the actual download URL from the JSON key
+                                content_id: gameInfo.title_id || '',
+                                region: gameInfo.region || 'Unknown',
+                                version: gameInfo.version || '',
+                                cover_url: gameInfo.cover_url || '',
+                                raw_data: gameInfo // Keep the raw data for debugging
                             };
-                        });
+                        })
+                        .filter(game => game !== null);
                     
                     console.log(`Successfully processed ${games.length} games`);
+                    console.log('Sample game:', games[0]);
                     
                     if (games.length === 0) {
                         throw new Error('No valid games found in data');
@@ -511,7 +503,7 @@
                             <span class="game-region">${game.region}</span>
                             <span>v${game.version}</span>
                         </div>
-                        <a href="${game.pkg}" class="download-btn" target="_blank">Download</a>
+                        <a href="${game.pkg}" class="download-btn" target="_blank" onclick="console.log('Download URL:', '${game.pkg}')">Download</a>
                     `;
                     
                     gameCard.appendChild(imgContainer);
