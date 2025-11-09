@@ -347,19 +347,28 @@
             let currentPage = 1;
             const gamesPerPage = 20;
             
-            // Get correct icon URL
+            // Get correct icon URL - prioritize cover_url from JSON
             function getIconUrl(game) {
-                if (!game.title_id) return [];
+                const urls = [];
                 
-                // Use title_id as CUSA ID
-                const cusaId = game.title_id;
-                return [
-                    game.cover_url, // Use the cover_url from the JSON first
-                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}.png`,
-                    `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`,
-                    `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}.png`,
-                    `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`
-                ].filter(url => url); // Remove empty URLs
+                // Always use the cover_url from JSON first if available
+                if (game.cover_url) {
+                    urls.push(game.cover_url);
+                }
+                
+                // Then add fallback URLs using title_id
+                if (game.title_id) {
+                    const cusaId = game.title_id;
+                    urls.push(
+                        `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}.png`,
+                        `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`,
+                        `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}.png`,
+                        `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`
+                    );
+                }
+                
+                // Remove any duplicate URLs and empty values
+                return [...new Set(urls.filter(url => url))];
             }
             
             // Load game data from the hosted JSON file
@@ -396,13 +405,13 @@
                                 region: gameInfo.region || 'Unknown',
                                 version: gameInfo.version || '',
                                 cover_url: gameInfo.cover_url || '',
-                                raw_data: gameInfo // Keep the raw data for debugging
+                                title_id: gameInfo.title_id || '' // Make sure title_id is available
                             };
                         })
                         .filter(game => game !== null);
                     
                     console.log(`Successfully processed ${games.length} games`);
-                    console.log('Sample game:', games[0]);
+                    console.log('Sample game with cover_url:', games[0]);
                     
                     if (games.length === 0) {
                         throw new Error('No valid games found in data');
@@ -440,8 +449,9 @@
                     const gameCard = document.createElement('div');
                     gameCard.className = 'game-card';
                     
-                    // Get possible icon URLs
+                    // Get possible icon URLs - cover_url should be first
                     const iconUrls = getIconUrl(game);
+                    console.log(`Game: ${game.title}, Cover URLs:`, iconUrls);
                     
                     // Create image element with proper error handling
                     const imgContainer = document.createElement('div');
@@ -449,6 +459,7 @@
                     
                     if (iconUrls.length > 0) {
                         const img = document.createElement('img');
+                        // Always use the first URL (which should be cover_url from JSON)
                         img.src = iconUrls[0];
                         img.alt = game.title;
                         img.style.width = '100%';
@@ -458,11 +469,14 @@
                         let currentFallbackIndex = 1;
                         
                         img.onerror = function() {
+                            console.log(`Failed to load cover: ${this.src}`);
                             if (currentFallbackIndex < iconUrls.length) {
+                                console.log(`Trying fallback: ${iconUrls[currentFallbackIndex]}`);
                                 this.src = iconUrls[currentFallbackIndex];
                                 currentFallbackIndex++;
                             } else {
                                 // All URLs failed, show title
+                                console.log(`All cover URLs failed for: ${game.title}`);
                                 this.style.display = 'none';
                                 const titleDiv = document.createElement('div');
                                 titleDiv.style.display = 'flex';
@@ -477,6 +491,10 @@
                                 imgContainer.innerHTML = '';
                                 imgContainer.appendChild(titleDiv);
                             }
+                        };
+                        
+                        img.onload = function() {
+                            console.log(`Successfully loaded cover: ${this.src} for ${game.title}`);
                         };
                         
                         imgContainer.appendChild(img);
@@ -503,7 +521,7 @@
                             <span class="game-region">${game.region}</span>
                             <span>v${game.version}</span>
                         </div>
-                        <a href="${game.pkg}" class="download-btn" target="_blank" onclick="console.log('Download URL:', '${game.pkg}')">Download</a>
+                        <a href="${game.pkg}" class="download-btn" target="_blank">Download</a>
                     `;
                     
                     gameCard.appendChild(imgContainer);
