@@ -347,250 +347,14 @@
             let currentPage = 1;
             const gamesPerPage = 20;
             
-            // Generate game data directly
-            function generateGameData() {
-                return [
-                    {
-                        title: "GONNER2",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/GONNER2%20-%20%5BUS%5D%20%5BEN%5D%20%5B1.00%5D.pkg",
-                        content_id: "UP4480-CUSA17606_00-GONNER2SIEA00000",
-                        region: "USA"
-                    },
-                    {
-                        title: "The Last of Us Remastered",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/The%20Last%20of%20Us%20Remastered%20%5BCUSA00552%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA00552_00-THELASTOFUS00000",
-                        region: "USA"
-                    },
-                    {
-                        title: "God of War",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/God%20of%20War%20%5BCUSA07408%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA07408_00-GODOFWAR0000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Horizon Zero Dawn",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Horizon%20Zero%20Dawn%20%5BCUSA07319%5D%20%5BEUR%5D.pkg",
-                        content_id: "UP9000-CUSA07319_00-HORIZONZERODOWN0",
-                        region: "EUR"
-                    },
-                    {
-                        title: "Spider-Man",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Spider-Man%20%5BCUSA02299%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA02299_00-MARVELSSPIDERMAN",
-                        region: "USA"
-                    },
-                    {
-                        title: "Uncharted 4: A Thief's End",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Uncharted%204%20-%20A%20Thief's%20End%20%5BCUSA00333%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA00333_00-UNCHARTED4000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Bloodborne",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Bloodborne%20%5BCUSA00900%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA00900_00-BLOODBORNE000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Persona 5",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Persona%205%20%5BCUSA06638%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA06638_00-PERSONA500000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Final Fantasy VII Remake",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Final%20Fantasy%20VII%20Remake%20%5BCUSA07187%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA07187_00-FFVIIREMAKE00000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Red Dead Redemption 2",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Red%20Dead%20Redemption%202%20%5BCUSA08519%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA08519_00-REDEMPTION200000",
-                        region: "USA"
-                    },
-                    {
-                        title: "The Witcher 3: Wild Hunt",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/The%20Witcher%203%20-%20Wild%20Hunt%20%5BCUSA05725%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA05725_00-THEWITCHER30000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Death Stranding",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Death%20Stranding%20%5BCUSA07802%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA07802_00-DEATHSTRANDING00",
-                        region: "USA"
-                    },
-                    {
-                        title: "Cyberpunk 2077",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Cyberpunk%202077%20%5BCUSA16579%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA16579_00-CYBERPUNK2077000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Ghost of Tsushima",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Ghost%20of%20Tsushima%20%5BCUSA13323%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA13323_00-GHOSTOFFTSUSHIMA0",
-                        region: "USA"
-                    },
-                    {
-                        title: "Demon's Souls",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Demon's%20Souls%20%5BCUSA07864%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA07864_00-DEMONSSOULS00000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Resident Evil 2",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Resident%20Evil%202%20%5BCUSA09171%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA09171_00-BH2R000000000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Resident Evil 3",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Resident%20Evil%203%20%5BCUSA14090%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA14090_00-BH3R000000000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "DOOM Eternal",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/DOOM%20Eternal%20%5BCUSA12384%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA12384_00-DOOMETERNAL00000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Assassin's Creed Valhalla",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Assassin's%20Creed%20Valhalla%20%5BCUSA18519%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA18519_00-ACVALHALLASIEPS4",
-                        region: "USA"
-                    },
-                    {
-                        title: "Call of Duty: Modern Warfare",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Call%20of%20Duty%20-%20Modern%20Warfare%20%5BCUSA15333%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA15333_00-CODMODERNWFPS4NA",
-                        region: "USA"
-                    },
-                    {
-                        title: "Grand Theft Auto V",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Grand%20Theft%20Auto%20V%20%5BCUSA00419%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA00419_00-GTAVDIGITAL0000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Minecraft",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Minecraft%20%5BCUSA00744%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA00744_00-MINECRAFTPS4000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Fallout 4",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Fallout%204%20%5BCUSA02532%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA02532_00-FALLOUT4FULLGAME",
-                        region: "USA"
-                    },
-                    {
-                        title: "The Elder Scrolls V: Skyrim",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/The%20Elder%20Scrolls%20V%20-%20Skyrim%20%5BCUSA05333%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA05333_00-THESCROLLSSKYRIM",
-                        region: "USA"
-                    },
-                    {
-                        title: "Battlefield 1",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Battlefield%201%20%5BCUSA02429%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA02429_00-BATTLEFIELD10000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Battlefield V",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Battlefield%20V%20%5BCUSA08829%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA08829_00-BATTLEFIELDV0000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Far Cry 5",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Far%20Cry%205%20%5BCUSA06802%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA06802_00-FARCRY5GAME0000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Far Cry New Dawn",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Far%20Cry%20New%20Dawn%20%5BCUSA12057%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA12057_00-FARCRYNEWDAWN000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Watch Dogs 2",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Watch%20Dogs%202%20%5BCUSA03762%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA03762_00-WATCHDOGS2000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Watch Dogs: Legion",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Watch%20Dogs%20-%20Legion%20%5BCUSA17282%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA17282_00-WATCHDOGSLEGION0",
-                        region: "USA"
-                    },
-                    {
-                        title: "Days Gone",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Days%20Gone%20%5BCUSA09173%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA09173_00-DAYSGONESIEA0000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Ratchet & Clank",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Ratchet%20%26%20Clank%20%5BCUSA02390%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA02390_00-RATCHETCLANK0000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Crash Bandicoot N. Sane Trilogy",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Crash%20Bandicoot%20N.%20Sane%20Trilogy%20%5BCUSA07021%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA07021_00-CRASHTRILOGY0000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Spyro Reignited Trilogy",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Spyro%20Reignited%20Trilogy%20%5BCUSA12439%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA12439_00-SPYROTRILOGY0000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Until Dawn",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Until%20Dawn%20%5BCUSA01411%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA01411_00-UNTILDAWN0000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Detroit: Become Human",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Detroit%20-%20Become%20Human%20%5BCUSA09311%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA09311_00-DETROIT000000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Heavy Rain",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Heavy%20Rain%20%5BCUSA01251%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA01251_00-HEAVYRAIN0000000",
-                        region: "USA"
-                    },
-                    {
-                        title: "Beyond: Two Souls",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Beyond%20-%20Two%20Souls%20%5BCUSA01250%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA01250_00-BEYONDTWOSOULS00",
-                        region: "USA"
-                    },
-                    {
-                        title: "The Last Guardian",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/The%20Last%20Guardian%20%5BCUSA02762%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA02762_00-THELASTGUARDIAN0",
-                        region: "USA"
-                    },
-                    {
-                        title: "Shadow of the Colossus",
-                        pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Shadow%20of%20the%20Colossus%20%5BCUSA08809%5D%20%5BUSA%5D.pkg",
-                        content_id: "UP9000-CUSA08809_00-SHADOWCOLOSSUS00",
-                        region: "USA"
-                    }
-                ];
+            // Function to extract filename from URL and create correct download link
+            function getCorrectDownloadLink(pkgUrl) {
+                // Extract filename from the URL
+                const filename = pkgUrl.split('/').pop();
+                // Encode the filename for URL (handles spaces and special characters)
+                const encodedFilename = encodeURIComponent(filename);
+                // Return the correct download URL
+                return `https://archive.org/download/ps4-fpkg-collection-english-g/${encodedFilename}`;
             }
             
             // Get correct icon URL
@@ -607,11 +371,38 @@
                 return [];
             }
             
-            // Initialize game data
-            function initializeGameData() {
-                games = generateGameData();
-                filteredGames = [...games];
-                displayGames();
+            // Load game data from the JSON file
+            async function loadGameData() {
+                try {
+                    // Using a simple CORS proxy to bypass restrictions
+                    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+                    const targetUrl = 'https://dn721605.ca.archive.org/0/items/ps4-fpkg-collection-english-fpkgi/GAMES.json';
+                    
+                    const response = await fetch(proxyUrl + targetUrl);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Process the data to fix download links
+                    games = data.map(game => {
+                        return {
+                            ...game,
+                            // Fix the download link
+                            pkg: getCorrectDownloadLink(game.pkg)
+                        };
+                    });
+                    
+                    console.log(`Successfully loaded ${games.length} games`);
+                    filteredGames = [...games];
+                    displayGames();
+                    
+                } catch (error) {
+                    console.error('Error fetching game data:', error);
+                    gamesContainer.innerHTML = '<div class="error">Failed to load game data. Please check the console for details.</div>';
+                }
             }
             
             // Display games in the grid with pagination
@@ -772,7 +563,7 @@
             });
             
             // Initialize
-            initializeGameData();
+            loadGameData();
         });
     </script>
 </body>
