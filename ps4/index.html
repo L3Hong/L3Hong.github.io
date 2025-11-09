@@ -283,7 +283,6 @@
         
         <footer>
             <p>PS4 Game Collection - For educational purposes only</p>
-            <p>Note: This page uses sample data. To use with the actual archive, you may need to run this through a CORS proxy.</p>
         </footer>
     </div>
 
@@ -297,57 +296,15 @@
             
             let games = [];
             
-            // Sample data to demonstrate the interface
-            const sampleGames = [
-                {
-                    title: "The Last of Us Remastered",
-                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/The.Last.of.Us.Remastered.pkg",
-                    content_id: "UP9000-CUSA00552_00-THELASTOFUS00000",
-                    region: "USA"
-                },
-                {
-                    title: "God of War",
-                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/God.of.War.pkg",
-                    content_id: "UP9000-CUSA07408_00-GODOFWAR0000000",
-                    region: "USA"
-                },
-                {
-                    title: "Horizon Zero Dawn",
-                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Horizon.Zero.Dawn.pkg",
-                    content_id: "UP9000-CUSA07319_00-HORIZONZERODOWN0",
-                    region: "EUR"
-                },
-                {
-                    title: "Spider-Man",
-                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Spider-Man.pkg",
-                    content_id: "UP9000-CUSA02299_00-MARVELSSPIDERMAN",
-                    region: "USA"
-                },
-                {
-                    title: "Uncharted 4: A Thief's End",
-                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Uncharted.4.pkg",
-                    content_id: "UP9000-CUSA00333_00-UNCHARTED4000000",
-                    region: "USA"
-                },
-                {
-                    title: "Bloodborne",
-                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Bloodborne.pkg",
-                    content_id: "UP9000-CUSA00900_00-BLOODBORNE000000",
-                    region: "USA"
-                },
-                {
-                    title: "Persona 5",
-                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/Persona.5.pkg",
-                    content_id: "UP9000-CUSA06638_00-PERSONA500000000",
-                    region: "JPN"
-                },
-                {
-                    title: "Final Fantasy VII Remake",
-                    pkg: "https://archive.org/download/ps4-fpkg-collection-english-fpkgi/FFVII.Remake.pkg",
-                    content_id: "UP9000-CUSA07187_00-FFVIIREMAKE00000",
-                    region: "USA"
-                }
-            ];
+            // Function to extract filename from URL and create correct download link
+            function getCorrectDownloadLink(pkgUrl) {
+                // Extract filename from the URL
+                const filename = pkgUrl.split('/').pop();
+                // Encode the filename for URL (handles spaces and special characters)
+                const encodedFilename = encodeURIComponent(filename);
+                // Return the correct download URL
+                return `https://archive.org/download/ps4-fpkg-collection-english-g/${encodedFilename}`;
+            }
             
             // Try to fetch the actual data first, then fall back to sample data
             function loadGameData() {
@@ -363,14 +320,70 @@
                         return response.json();
                     })
                     .then(data => {
-                        games = data;
+                        // Process the data to fix download links
+                        games = data.map(game => {
+                            return {
+                                ...game,
+                                // Fix the download link
+                                pkg: getCorrectDownloadLink(game.pkg)
+                            };
+                        });
                         displayGames(games);
                     })
                     .catch(error => {
                         console.error('Error fetching game data with proxy:', error);
-                        // Fall back to sample data
+                        // Fall back to sample data with correct download links
                         console.log('Using sample data instead');
-                        games = sampleGames;
+                        games = [
+                            {
+                                title: "GONNER2",
+                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/GONNER2%20-%20%5BUS%5D%20%5BEN%5D%20%5B1.00%5D.pkg",
+                                content_id: "UP0000-CUSA00000_00-GONNER200000000",
+                                region: "USA"
+                            },
+                            {
+                                title: "The Last of Us Remastered",
+                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/The.Last.of.Us.Remastered.pkg",
+                                content_id: "UP9000-CUSA00552_00-THELASTOFUS00000",
+                                region: "USA"
+                            },
+                            {
+                                title: "God of War",
+                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/God.of.War.pkg",
+                                content_id: "UP9000-CUSA07408_00-GODOFWAR0000000",
+                                region: "USA"
+                            },
+                            {
+                                title: "Horizon Zero Dawn",
+                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Horizon.Zero.Dawn.pkg",
+                                content_id: "UP9000-CUSA07319_00-HORIZONZERODOWN0",
+                                region: "EUR"
+                            },
+                            {
+                                title: "Spider-Man",
+                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Spider-Man.pkg",
+                                content_id: "UP9000-CUSA02299_00-MARVELSSPIDERMAN",
+                                region: "USA"
+                            },
+                            {
+                                title: "Uncharted 4: A Thief's End",
+                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Uncharted.4.pkg",
+                                content_id: "UP9000-CUSA00333_00-UNCHARTED4000000",
+                                region: "USA"
+                            },
+                            {
+                                title: "Bloodborne",
+                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Bloodborne.pkg",
+                                content_id: "UP9000-CUSA00900_00-BLOODBORNE000000",
+                                region: "USA"
+                            },
+                            {
+                                title: "Persona 5",
+                                pkg: "https://archive.org/download/ps4-fpkg-collection-english-g/Persona.5.pkg",
+                                content_id: "UP9000-CUSA06638_00-PERSONA500000000",
+                                region: "JPN"
+                            }
+                        ];
                         displayGames(games);
                     });
             }
@@ -394,7 +407,7 @@
                     
                     gameCard.innerHTML = `
                         <div class="game-image">
-                            <img src="${iconUrl}" alt="${game.title}" onerror="this.style.display='none'; this.parentNode.innerHTML='<div style=\\'display: flex; align-items: center; justify-content: center; height: 100%;\\'>${game.title}</div>';" style="width: 100%; height: 100%; object-fit: cover;">
+                            <img src="${iconUrl}" alt="${game.title}" onerror="this.style.display='none'; this.parentNode.innerHTML='<div style=\\'display: flex; align-items: center; justify-content: center; height: 100%; padding: 10px; text-align: center;\\'>${game.title}</div>';" style="width: 100%; height: 100%; object-fit: cover;">
                         </div>
                         <div class="game-info">
                             <h3 class="game-title">${game.title}</h3>
