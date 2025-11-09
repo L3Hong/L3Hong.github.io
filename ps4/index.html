@@ -349,8 +349,12 @@
             
             // Function to extract filename from URL and create correct download link
             function getCorrectDownloadLink(pkgUrl) {
+                if (!pkgUrl) return '#';
+                
                 // Extract filename from the URL
                 const filename = pkgUrl.split('/').pop();
+                if (!filename) return '#';
+                
                 // Encode the filename for URL (handles spaces and special characters)
                 const encodedFilename = encodeURIComponent(filename);
                 // Return the correct download URL
@@ -359,11 +363,15 @@
             
             // Get correct icon URL
             function getIconUrl(game) {
+                if (!game.content_id) return [];
+                
                 // Extract CUSA ID from content_id
                 const cusaMatch = game.content_id.match(/CUSA\d+/);
                 if (cusaMatch) {
                     const cusaId = cusaMatch[0];
                     return [
+                        `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}.png`,
+                        `https://archive.org/download/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`,
                         `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}.png`,
                         `https://dn710101.ca.archive.org/0/items/ps4-fpkg-collection-english-icons/${cusaId}_thumb.jpg`
                     ];
@@ -374,6 +382,7 @@
             // Load game data from the hosted JSON file
             async function loadGameData() {
                 try {
+                    console.log('Fetching game data...');
                     const response = await fetch('GAMES.json');
                     
                     if (!response.ok) {
@@ -381,29 +390,45 @@
                     }
                     
                     const data = await response.json();
+                    console.log('Raw data received:', data);
+                    
+                    if (!Array.isArray(data)) {
+                        throw new Error('Data is not an array');
+                    }
                     
                     // Process the data to fix download links
                     games = data.map(game => {
+                        if (!game || typeof game !== 'object') {
+                            console.warn('Invalid game data:', game);
+                            return null;
+                        }
+                        
                         return {
-                            ...game,
-                            // Fix the download link
-                            pkg: getCorrectDownloadLink(game.pkg)
+                            title: game.title || 'Unknown Title',
+                            pkg: getCorrectDownloadLink(game.pkg),
+                            content_id: game.content_id || '',
+                            region: game.region || 'Unknown'
                         };
-                    });
+                    }).filter(game => game !== null);
                     
-                    console.log(`Successfully loaded ${games.length} games`);
+                    console.log(`Successfully processed ${games.length} games`);
+                    
+                    if (games.length === 0) {
+                        throw new Error('No valid games found in data');
+                    }
+                    
                     filteredGames = [...games];
                     displayGames();
                     
                 } catch (error) {
-                    console.error('Error fetching game data:', error);
-                    gamesContainer.innerHTML = '<div class="error">Failed to load game data. Please check the console for details.</div>';
+                    console.error('Error loading game data:', error);
+                    gamesContainer.innerHTML = '<div class="error">Failed to load game data: ' + error.message + '</div>';
                 }
             }
             
             // Display games in the grid with pagination
             function displayGames() {
-                if (filteredGames.length === 0) {
+                if (!filteredGames || filteredGames.length === 0) {
                     gamesContainer.innerHTML = '<div class="no-results">No games found matching your search.</div>';
                     gameCount.textContent = '0 games found';
                     pagination.style.display = 'none';
@@ -419,6 +444,8 @@
                 gamesContainer.innerHTML = '';
                 
                 gamesToDisplay.forEach(game => {
+                    if (!game) return;
+                    
                     const gameCard = document.createElement('div');
                     gameCard.className = 'game-card';
                     
@@ -437,33 +464,28 @@
                         img.style.height = '100%';
                         img.style.objectFit = 'cover';
                         
+                        let currentFallbackIndex = 1;
+                        
                         img.onerror = function() {
-                            // Try fallback URLs
-                            let currentIndex = 1;
-                            const tryNextFallback = () => {
-                                if (currentIndex < iconUrls.length) {
-                                    this.src = iconUrls[currentIndex];
-                                    currentIndex++;
-                                } else {
-                                    // All URLs failed, show title
-                                    this.style.display = 'none';
-                                    const titleDiv = document.createElement('div');
-                                    titleDiv.style.display = 'flex';
-                                    titleDiv.style.alignItems = 'center';
-                                    titleDiv.style.justifyContent = 'center';
-                                    titleDiv.style.height = '100%';
-                                    titleDiv.style.padding = '10px';
-                                    titleDiv.style.textAlign = 'center';
-                                    titleDiv.style.fontWeight = 'bold';
-                                    titleDiv.style.fontSize = '1.1rem';
-                                    titleDiv.textContent = game.title;
-                                    imgContainer.innerHTML = '';
-                                    imgContainer.appendChild(titleDiv);
-                                }
-                            };
-                            
-                            this.onerror = tryNextFallback;
-                            tryNextFallback();
+                            if (currentFallbackIndex < iconUrls.length) {
+                                this.src = iconUrls[currentFallbackIndex];
+                                currentFallbackIndex++;
+                            } else {
+                                // All URLs failed, show title
+                                this.style.display = 'none';
+                                const titleDiv = document.createElement('div');
+                                titleDiv.style.display = 'flex';
+                                titleDiv.style.alignItems = 'center';
+                                titleDiv.style.justifyContent = 'center';
+                                titleDiv.style.height = '100%';
+                                titleDiv.style.padding = '10px';
+                                titleDiv.style.textAlign = 'center';
+                                titleDiv.style.fontWeight = 'bold';
+                                titleDiv.style.fontSize = '1.1rem';
+                                titleDiv.textContent = game.title;
+                                imgContainer.innerHTML = '';
+                                imgContainer.appendChild(titleDiv);
+                            }
                         };
                         
                         imgContainer.appendChild(img);
@@ -482,17 +504,18 @@
                         imgContainer.appendChild(titleDiv);
                     }
                     
-                    gameCard.innerHTML = `
-                        <div class="game-info">
-                            <h3 class="game-title">${game.title}</h3>
-                            <div class="game-details">
-                                <span class="game-region">${game.region || 'Unknown'}</span>
-                            </div>
-                            <a href="${game.pkg}" class="download-btn" target="_blank">Download</a>
+                    const gameInfo = document.createElement('div');
+                    gameInfo.className = 'game-info';
+                    gameInfo.innerHTML = `
+                        <h3 class="game-title">${game.title}</h3>
+                        <div class="game-details">
+                            <span class="game-region">${game.region}</span>
                         </div>
+                        <a href="${game.pkg}" class="download-btn" target="_blank">Download</a>
                     `;
                     
-                    gameCard.prepend(imgContainer);
+                    gameCard.appendChild(imgContainer);
+                    gameCard.appendChild(gameInfo);
                     gamesContainer.appendChild(gameCard);
                 });
                 
