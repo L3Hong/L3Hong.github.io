@@ -392,12 +392,19 @@
                     const data = await response.json();
                     console.log('Raw data received:', data);
                     
-                    if (!Array.isArray(data)) {
-                        throw new Error('Data is not an array');
+                    // The data has a DATA property that contains the games
+                    if (!data.DATA || typeof data.DATA !== 'object') {
+                        throw new Error('DATA property not found or invalid in JSON');
                     }
                     
-                    // Process the data to fix download links
-                    games = data.map(game => {
+                    // Convert the DATA object to an array of games
+                    games = Object.values(data.DATA).map(gameArray => {
+                        if (!Array.isArray(gameArray) || gameArray.length === 0) {
+                            console.warn('Invalid game array:', gameArray);
+                            return null;
+                        }
+                        
+                        const game = gameArray[0];
                         if (!game || typeof game !== 'object') {
                             console.warn('Invalid game data:', game);
                             return null;
