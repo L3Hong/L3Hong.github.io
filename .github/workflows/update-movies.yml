@@ -1,21 +1,16 @@
 name: Update Horror Movies
 
-# Force Node.js 24 to avoid deprecation warnings
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   schedule:
-    # Runs every 6 hours
     - cron: '0 */6 * * *'
-  # Allows manual trigger from Actions tab
   workflow_dispatch:
 
 jobs:
   update-movies:
     runs-on: ubuntu-latest
-    
-    # IMPORTANT: Give the workflow permission to write to the repo
     permissions:
       contents: write
     
@@ -24,20 +19,25 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          # Use the built-in GitHub token for authentication
           token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Fetch DailyMotion movies
         run: |
-          echo "📡 Fetching DailyMotion: new horror full movie english (limit 150)..."
-          curl -s "https://api.dailymotion.com/videos?search=new+horror+full+movie+english&limit=150&fields=id,title,description,thumbnail_240_url" > dm.json
-          echo "✅ DailyMotion fetched"
+          echo "📡 Fetching DailyMotion: horror full movie (limit 100)..."
+          curl -s "https://api.dailymotion.com/videos?search=horror+full+movie&limit=100&fields=id,title,description,thumbnail_240_url" > dm.json
+          
+          # Check how many results
+          DM_COUNT=$(cat dm.json | jq '.list | length' 2>/dev/null || echo "0")
+          echo "✅ DailyMotion returned: $DM_COUNT movies"
           
       - name: Fetch Bilibili movies
         run: |
-          echo "📡 Fetching Bilibili: new horror full movie english..."
-          curl -s "https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=new%20horror%20full%20movie%20english&page=1" > bili.json
-          echo "✅ Bilibili fetched"
+          echo "📡 Fetching Bilibili: horror full movie..."
+          curl -s "https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=horror%20full%20movie&page=1" > bili.json
+          
+          # Check how many results
+          BILI_COUNT=$(cat bili.json | jq '.data.result | length' 2>/dev/null || echo "0")
+          echo "✅ Bilibili returned: $BILI_COUNT movies"
           
       - name: Combine movies into JSON
         run: |
@@ -50,7 +50,7 @@ jobs:
             let dmMovies = [];
             try {
               const dm = JSON.parse(fs.readFileSync('dm.json'));
-              if (dm.list) {
+              if (dm.list && dm.list.length > 0) {
                 dmMovies = dm.list.map(v => ({
                   title: v.title || 'Untitled Horror',
                   link: 'https://www.dailymotion.com/video/' + v.id,
@@ -59,22 +59,44 @@ jobs:
                   source: 'dailymotion'
                 }));
                 console.log('  📺 DailyMotion: ' + dmMovies.length + ' movies');
+              } else {
+                console.log('  📺 DailyMotion: 0 movies (empty response)');
               }
-            } catch(e) { console.log('  ❌ DM error:', e.message); }
+            } catch(e) { 
+              console.log('  ❌ DM error:', e.message); 
+              // Try fallback search
+              try {
+                const dmFallback = JSON.parse(fs.readFileSync('dm.json'));
+                console.log('  📺 DailyMotion raw response:', JSON.stringify(dmFallback).slice(0, 200));
+              } catch(e2) {}
+            }
             
             // Bilibili
             let biliMovies = [];
             try {
               const bili = JSON.parse(fs.readFileSync('bili.json'));
               if (bili.code === 0 && bili.data && bili.data.result) {
-                biliMovies = bili.data.result.map(v => ({
-                  title: v.title ? v.title.replace(/<[^>]*>/g, '') : 'Bilibili Horror',
-                  link: 'https://www.bilibili.com/video/' + v.bvid,
-                  thumbnail: v.pic || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
-                  description: (v.description || 'Full movie on Bilibili').slice(0, 100),
-                  source: 'bilibili'
-                }));
-                console.log('  📺 Bilibili: ' + biliMovies.length + ' movies');
+                // Filter for English titles or horror content
+                biliMovies = bili.data.result
+                  .filter(v => {
+                    const title = v.title || '';
+                    // Keep movies with English titles or horror keywords
+                    return title.match(/[a-zA-Z]/) || 
+                           title.includes('horror') || 
+                           title.includes('恐怖') ||
+                           title.includes('惊悚');
+                  })
+                  .slice(0, 30)
+                  .map(v => ({
+                    title: v.title ? v.title.replace(/<[^>]*>/g, '').trim() : 'Bilibili Horror',
+                    link: 'https://www.bilibili.com/video/' + v.bvid,
+                    thumbnail: v.pic ? 'https:' + v.pic : 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
+                    description: (v.description || 'Full movie on Bilibili').slice(0, 100),
+                    source: 'bilibili'
+                  }));
+                console.log('  📺 Bilibili: ' + biliMovies.length + ' movies (filtered)');
+              } else {
+                console.log('  📺 Bilibili: 0 movies or error');
               }
             } catch(e) { console.log('  ❌ Bili error:', e.message); }
             
@@ -82,7 +104,7 @@ jobs:
             const allMovies = [...dmMovies, ...biliMovies];
             console.log('📊 Total movies: ' + allMovies.length);
             
-            // Add IMDb ratings (simulated based on title)
+            // Add IMDb ratings (simulated)
             const moviesWithRatings = allMovies.map(m => {
               let hash = 0;
               for (let i = 0; i < m.title.length; i++) {
