@@ -15,11 +15,17 @@ jobs:
   update-movies:
     runs-on: ubuntu-latest
     
+    # IMPORTANT: Give the workflow permission to write to the repo
+    permissions:
+      contents: write
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          # Use the built-in GitHub token for authentication
+          token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Fetch DailyMotion movies
         run: |
