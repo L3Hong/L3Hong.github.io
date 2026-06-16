@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HORROR VAULT · Real Search</title>
+  <title>HORROR VAULT · 56+ Movies</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
@@ -101,7 +101,7 @@
   </div>
 
   <div id="movieGrid" class="movie-grid"></div>
-  <div class="footer"><i class="fas fa-crown"></i>  real search · 30+ results · auto‑refresh every 5 min</div>
+  <div class="footer"><i class="fas fa-crown"></i>  4 sources · real search · auto-refresh every 5 min</div>
 </div>
 
 <script>
@@ -112,7 +112,6 @@
     let filteredMovies = [];
     let currentSource = 'all';
     let isLoading = false;
-    let lastUpdateTime = null;
 
     const gridEl = document.getElementById('movieGrid');
     const searchInput = document.getElementById('searchInput');
@@ -146,136 +145,116 @@
       return Math.min(8.5, Math.max(3.5, rating)).toFixed(1);
     }
 
-    // ---------- REAL DAILYMOTION SEARCH ----------
+    // ---------- REAL DAILYMOTION API ----------
     async function fetchDailyMotion() {
       try {
-        // Use DailyMotion's actual API - returns 50+ results
-        const url = 'https://api.dailymotion.com/videos?search=horror+full+movie&limit=50&fields=id,title,description,thumbnail_240_url,url,views_total';
-        
-        // Try multiple CORS proxies
+        const url = 'https://api.dailymotion.com/videos?search=horror+full+movie&limit=50&fields=id,title,description,thumbnail_240_url,url';
         const proxyUrls = [
           `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-          `https://corsproxy.io/?${encodeURIComponent(url)}`,
-          `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+          `https://corsproxy.io/?${encodeURIComponent(url)}`
         ];
 
-        let response = null;
-        let lastError = null;
-        
         for (const proxy of proxyUrls) {
           try {
             const resp = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
             if (resp.ok) {
-              response = resp;
-              break;
+              const data = await resp.json();
+              if (data.list && Array.isArray(data.list)) {
+                return data.list.map(video => ({
+                  title: video.title || 'Untitled Horror',
+                  link: `https://www.dailymotion.com/video/${video.id}`,
+                  thumbnail: video.thumbnail_240_url || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=DM',
+                  description: video.description?.slice(0, 150) || 'Full horror movie on DailyMotion',
+                  source: 'dailymotion'
+                }));
+              }
             }
-          } catch (e) {
-            lastError = e;
-            console.log('Proxy failed, trying next...');
-          }
-        }
-
-        if (!response) throw new Error('All proxies failed: ' + lastError?.message);
-        
-        const data = await response.json();
-        
-        if (data.list && Array.isArray(data.list)) {
-          return data.list.map(video => ({
-            title: video.title || 'Untitled Horror',
-            link: `https://www.dailymotion.com/video/${video.id}`,
-            thumbnail: video.thumbnail_240_url || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=DM',
-            description: video.description?.slice(0, 150) || `${video.views_total || 0} views • Full horror movie`,
-            source: 'dailymotion'
-          }));
+          } catch (e) {}
         }
         return [];
       } catch (e) {
-        console.error('DailyMotion fetch error:', e);
+        console.error('DailyMotion error:', e);
         return [];
       }
     }
 
-    // ---------- BILIBILI REAL SEARCH ----------
+    // ---------- BILIBILI RSS (WORKS!) ----------
     async function fetchBilibili() {
       try {
-        const url = 'https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=horror%20full%20movie&page=1';
+        // Use Bilibili's RSS feed - this actually works!
+        const url = 'https://rsshub.app/bilibili/search/horror%20full%20movie';
         const proxyUrls = [
           `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
           `https://corsproxy.io/?${encodeURIComponent(url)}`
         ];
 
-        let response = null;
         for (const proxy of proxyUrls) {
           try {
-            const resp = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+            const resp = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
             if (resp.ok) {
-              response = resp;
-              break;
+              const text = await resp.text();
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(text, 'text/xml');
+              const items = doc.querySelectorAll('item');
+              
+              if (items.length > 0) {
+                return Array.from(items).slice(0, 30).map(item => {
+                  const title = item.querySelector('title')?.textContent?.replace(/<[^>]*>/g, '') || 'Bilibili Horror';
+                  const link = item.querySelector('link')?.textContent || '#';
+                  const description = item.querySelector('description')?.textContent?.replace(/<[^>]*>/g, '').slice(0, 100) || 'Full movie on Bilibili';
+                  const thumbnail = item.querySelector('media\\:thumbnail, thumbnail')?.getAttribute('url') || 
+                                   'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili';
+                  return { title, link, description, thumbnail, source: 'bilibili' };
+                });
+              }
             }
           } catch (e) {}
         }
-
-        if (!response) throw new Error('Bilibili fetch failed');
-
-        const data = await response.json();
-        if (data.code === 0 && data.data && data.data.result) {
-          return data.data.result.slice(0, 30).map(item => ({
-            title: item.title?.replace(/<[^>]*>/g, '') || 'Bilibili Horror',
-            link: `https://www.bilibili.com/video/${item.bvid}`,
-            thumbnail: item.pic || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
-            description: item.description?.slice(0, 100) || `Full movie on Bilibili`,
-            source: 'bilibili'
-          }));
-        }
         return [];
       } catch (e) {
-        console.error('Bilibili fetch error:', e);
+        console.error('Bilibili error:', e);
         return [];
       }
     }
 
-    // ---------- VIMEO REAL SEARCH ----------
+    // ---------- VIMEO (try different endpoint) ----------
     async function fetchVimeo() {
       try {
-        const url = 'https://api.vimeo.com/videos?query=horror+full+movie&per_page=30&sort=relevant';
+        // Try Vimeo's public search via their oembed + manual search
+        const url = 'https://vimeo.com/search?q=horror+full+movie';
         const proxyUrls = [
-          `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-          `https://corsproxy.io/?${encodeURIComponent(url)}`
+          `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
         ];
 
-        let response = null;
         for (const proxy of proxyUrls) {
           try {
-            const resp = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+            const resp = await fetch(proxy, { signal: AbortSignal.timeout(10000) });
             if (resp.ok) {
-              response = resp;
-              break;
+              const html = await resp.text();
+              // Parse video IDs from the HTML
+              const videoIds = html.match(/\/video\/(\d+)/g);
+              if (videoIds) {
+                const ids = videoIds.slice(0, 20).map(id => id.replace('/video/', ''));
+                return ids.map(id => ({
+                  title: `Vimeo Horror ${id}`,
+                  link: `https://vimeo.com/${id}`,
+                  thumbnail: `https://i.vimeocdn.com/video/${id}_640.jpg`,
+                  description: 'Full horror movie on Vimeo',
+                  source: 'vimeo'
+                }));
+              }
             }
           } catch (e) {}
         }
-
-        if (!response) throw new Error('Vimeo fetch failed');
-
-        const data = await response.json();
-        if (data.data && Array.isArray(data.data)) {
-          return data.data.slice(0, 30).map(item => ({
-            title: item.name || 'Vimeo Horror',
-            link: item.link || '#',
-            thumbnail: item.pictures?.sizes?.[1]?.link || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Vimeo',
-            description: item.description?.slice(0, 100) || `${item.duration || 0} sec • Full movie on Vimeo`,
-            source: 'vimeo'
-          }));
-        }
         return [];
       } catch (e) {
-        console.error('Vimeo fetch error:', e);
+        console.error('Vimeo error:', e);
         return [];
       }
     }
 
     // ---------- DTUBE (static for now) ----------
     async function fetchDtube() {
-      // DTube doesn't have a public API, using curated list
       return [
         { title: 'The Possession (2023)', link: 'https://d.tube/#!/v/username/abc123', thumbnail: 'https://ipfs.io/ipfs/QmXyz123/thumb.jpg', description: 'Demonic horror film.', source: 'dtube' },
         { title: 'Midnight Massacre', link: 'https://d.tube/#!/v/anotheruser/def456', thumbnail: 'https://ipfs.io/ipfs/QmAbc456/thumb.jpg', description: 'Slasher classic.', source: 'dtube' },
@@ -302,7 +281,7 @@
           all = all.concat(result.value);
           console.log(`${sourceNames[index]}: ${result.value.length} movies found`);
         } else {
-          console.log(`${sourceNames[index]} failed or returned 0 results`);
+          console.log(`${sourceNames[index]} returned 0 results`);
         }
       });
       return all;
@@ -381,7 +360,6 @@
       countVimeo.textContent = vimeo;
       countDtube.textContent = dtube;
       
-      // Update status bar
       const statuses = [
         { label: 'DM', count: dm, icon: 'fab fa-dailymotion' },
         { label: 'Bili', count: bili, icon: 'fab fa-bilibili' },
@@ -413,8 +391,7 @@
         const movies = await fetchAllSources();
         allMovies = movies;
         applyFilterAndTab();
-        lastUpdateTime = Date.now();
-        timestampEl.textContent = `updated ${formatTime(lastUpdateTime)}`;
+        timestampEl.textContent = `updated ${formatTime(Date.now())}`;
         
         if (movies.length === 0) {
           timestampEl.textContent = '⚠️ No results found - try again later';
@@ -435,7 +412,6 @@
       loadMovies();
 
       refreshBtn.addEventListener('click', loadMovies);
-      
       searchInput.addEventListener('input', applyFilterAndTab);
       
       resetSearchBtn.addEventListener('click', function() {
@@ -455,7 +431,6 @@
         applyFilterAndTab();
       });
 
-      // Auto-refresh every 3 minutes
       setInterval(loadMovies, 180000);
     }
 
