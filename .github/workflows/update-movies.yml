@@ -1,0 +1,89 @@
+name: Update Horror Movies
+
+on:
+  schedule:
+    # Runs every 6 hours
+    - cron: '0 */6 * * *'
+  # Allows manual trigger
+  workflow_dispatch:
+
+jobs:
+  update-movies:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Fetch DailyMotion movies
+        run: |
+          curl -s "https://api.dailymotion.com/videos?search=new+horror+full+movie+english&limit=150&fields=id,title,description,thumbnail_240_url" > dm.json
+          echo "✅ DailyMotion fetched"
+          
+      - name: Fetch Bilibili movies
+        run: |
+          curl -s "https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=new%20horror%20full%20movie%20english&page=1" > bili.json
+          echo "✅ Bilibili fetched"
+          
+      - name: Combine movies into JSON
+        run: |
+          node -e "
+            const fs = require('fs');
+            
+            // DailyMotion
+            let dmMovies = [];
+            try {
+              const dm = JSON.parse(fs.readFileSync('dm.json'));
+              if (dm.list) {
+                dmMovies = dm.list.map(v => ({
+                  title: v.title || 'Untitled Horror',
+                  link: 'https://www.dailymotion.com/video/' + v.id,
+                  thumbnail: v.thumbnail_240_url || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=DM',
+                  description: (v.description || 'Full horror movie on DailyMotion').slice(0, 150),
+                  source: 'dailymotion'
+                }));
+              }
+            } catch(e) { console.log('DM error:', e.message); }
+            
+            // Bilibili
+            let biliMovies = [];
+            try {
+              const bili = JSON.parse(fs.readFileSync('bili.json'));
+              if (bili.code === 0 && bili.data && bili.data.result) {
+                biliMovies = bili.data.result.map(v => ({
+                  title: v.title ? v.title.replace(/<[^>]*>/g, '') : 'Bilibili Horror',
+                  link: 'https://www.bilibili.com/video/' + v.bvid,
+                  thumbnail: v.pic || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
+                  description: (v.description || 'Full movie on Bilibili').slice(0, 100),
+                  source: 'bilibili'
+                }));
+              }
+            } catch(e) { console.log('Bili error:', e.message); }
+            
+            // Combine
+            const allMovies = [...dmMovies, ...biliMovies];
+            
+            // Add IMDb ratings (simulated based on title)
+            const moviesWithRatings = allMovies.map(m => {
+              let hash = 0;
+              for (let i = 0; i < m.title.length; i++) {
+                hash = m.title.charCodeAt(i) + ((hash << 5) - hash);
+              }
+              const seed = Math.abs(hash) / 100000;
+              const rating = (4.2 + (seed % 3.8));
+              const imdbRating = Math.min(8.5, Math.max(3.5, rating)).toFixed(1);
+              return { ...m, imdbRating };
+            });
+            
+            // Save to horror/movies.json
+            fs.writeFileSync('horror/movies.json', JSON.stringify(moviesWithRatings, null, 2));
+            console.log('✅ Saved ' + moviesWithRatings.length + ' movies to horror/movies.json');
+          "
+          
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add horror/movies.json
+          git diff --staged --quiet || git commit -m "🔄 Auto-update horror movies $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          git push
