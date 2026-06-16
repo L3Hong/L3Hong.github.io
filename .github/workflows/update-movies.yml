@@ -25,32 +25,98 @@ jobs:
         run: |
           echo "📡 Fetching DailyMotion: horror full movie (limit 100)..."
           curl -s "https://api.dailymotion.com/videos?search=horror+full+movie&limit=100&fields=id,title,description,thumbnail_240_url" > dm.json
-          
-          # Check how many results
           DM_COUNT=$(cat dm.json | jq '.list | length' 2>/dev/null || echo "0")
           echo "✅ DailyMotion returned: $DM_COUNT movies"
           
-      - name: Fetch Bilibili movies
+      - name: Fetch Bilibili movies (via RSS)
         run: |
-          echo "📡 Fetching Bilibili: horror full movie..."
-          curl -s "https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=horror%20full%20movie&page=1" > bili.json
+          echo "📡 Fetching Bilibili via RSS: horror full movie..."
           
-          # Check how many results
-          BILI_COUNT=$(cat bili.json | jq '.data.result | length' 2>/dev/null || echo "0")
-          echo "✅ Bilibili returned: $BILI_COUNT movies"
+          # Try RSSHub (most reliable)
+          curl -s "https://rsshub.app/bilibili/search/horror%20full%20movie" > bili_rss.xml
           
-      - name: Combine movies into JSON
+          # Check if RSS worked
+          if grep -q "item" bili_rss.xml 2>/dev/null; then
+            echo "✅ Bilibili RSS returned results"
+            cat bili_rss.xml > bili.xml
+          else
+            echo "⚠️ RSS failed, trying fallback..."
+            # Fallback: Use a different RSS endpoint
+            curl -s "https://api.rss2json.com/v1/api.json?rss_url=https://rsshub.app/bilibili/search/horror%20full%20movie&api_key=zwnbjojjnjhgjyc4f8bcqbe1r5oj3cz4sqayplnw&count=30" > bili_fallback.json
+            echo "✅ Fallback attempted"
+          fi
+          
+      - name: Parse Bilibili results
         run: |
           node -e "
             const fs = require('fs');
             
-            console.log('🔄 Combining movies from all sources...');
+            let biliMovies = [];
+            
+            // Try RSS XML first
+            try {
+              const xml = fs.readFileSync('bili.xml', 'utf8');
+              // Simple XML parsing with regex (works for RSS)
+              const items = xml.split('<item>');
+              if (items.length > 1) {
+                items.slice(1).forEach(item => {
+                  const titleMatch = item.match(/<title>(.*?)<\/title>/);
+                  const linkMatch = item.match(/<link>(.*?)<\/link>/);
+                  const descMatch = item.match(/<description>(.*?)<\/description>/);
+                  const thumbMatch = item.match(/<media:thumbnail url=\"(.*?)\"/);
+                  
+                  if (titleMatch && linkMatch) {
+                    biliMovies.push({
+                      title: titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/, '$1').trim() || 'Bilibili Horror',
+                      link: linkMatch[1] || '#',
+                      thumbnail: thumbMatch ? thumbMatch[1] : 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
+                      description: descMatch ? descMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/, '$1').slice(0, 100) : 'Full movie on Bilibili',
+                      source: 'bilibili'
+                    });
+                  }
+                });
+                console.log('  📺 Bilibili (RSS): ' + biliMovies.length + ' movies');
+              }
+            } catch(e) {
+              console.log('  📺 RSS parse error:', e.message);
+            }
+            
+            // If RSS failed, try JSON fallback
+            if (biliMovies.length === 0) {
+              try {
+                const fallback = JSON.parse(fs.readFileSync('bili_fallback.json', 'utf8'));
+                if (fallback.items && fallback.items.length > 0) {
+                  biliMovies = fallback.items.map(item => ({
+                    title: item.title || 'Bilibili Horror',
+                    link: item.link || '#',
+                    thumbnail: item.thumbnail || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
+                    description: item.description ? item.description.replace(/<[^>]*>/g, '').slice(0, 100) : 'Full movie on Bilibili',
+                    source: 'bilibili'
+                  }));
+                  console.log('  📺 Bilibili (JSON): ' + biliMovies.length + ' movies');
+                }
+              } catch(e) {
+                console.log('  📺 JSON fallback error:', e.message);
+              }
+            }
+            
+            // Save Bilibili results
+            fs.writeFileSync('bili_movies.json', JSON.stringify(biliMovies));
+            console.log('✅ Bilibili total: ' + biliMovies.length + ' movies');
+          "
+          
+      - name: Combine all movies
+        run: |
+          node -e "
+            const fs = require('fs');
+            
+            console.log('🔄 Combining movies...');
             
             // DailyMotion
             let dmMovies = [];
             try {
               const dm = JSON.parse(fs.readFileSync('dm.json'));
-              if (dm.list && dm.list.length > 0) {
+              if (dm.list) {
                 dmMovies = dm.list.map(v => ({
                   title: v.title || 'Untitled Horror',
                   link: 'https://www.dailymotion.com/video/' + v.id,
@@ -59,52 +125,21 @@ jobs:
                   source: 'dailymotion'
                 }));
                 console.log('  📺 DailyMotion: ' + dmMovies.length + ' movies');
-              } else {
-                console.log('  📺 DailyMotion: 0 movies (empty response)');
               }
-            } catch(e) { 
-              console.log('  ❌ DM error:', e.message); 
-              // Try fallback search
-              try {
-                const dmFallback = JSON.parse(fs.readFileSync('dm.json'));
-                console.log('  📺 DailyMotion raw response:', JSON.stringify(dmFallback).slice(0, 200));
-              } catch(e2) {}
-            }
+            } catch(e) { console.log('  ❌ DM error:', e.message); }
             
             // Bilibili
             let biliMovies = [];
             try {
-              const bili = JSON.parse(fs.readFileSync('bili.json'));
-              if (bili.code === 0 && bili.data && bili.data.result) {
-                // Filter for English titles or horror content
-                biliMovies = bili.data.result
-                  .filter(v => {
-                    const title = v.title || '';
-                    // Keep movies with English titles or horror keywords
-                    return title.match(/[a-zA-Z]/) || 
-                           title.includes('horror') || 
-                           title.includes('恐怖') ||
-                           title.includes('惊悚');
-                  })
-                  .slice(0, 30)
-                  .map(v => ({
-                    title: v.title ? v.title.replace(/<[^>]*>/g, '').trim() : 'Bilibili Horror',
-                    link: 'https://www.bilibili.com/video/' + v.bvid,
-                    thumbnail: v.pic ? 'https:' + v.pic : 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
-                    description: (v.description || 'Full movie on Bilibili').slice(0, 100),
-                    source: 'bilibili'
-                  }));
-                console.log('  📺 Bilibili: ' + biliMovies.length + ' movies (filtered)');
-              } else {
-                console.log('  📺 Bilibili: 0 movies or error');
-              }
+              biliMovies = JSON.parse(fs.readFileSync('bili_movies.json'));
+              console.log('  📺 Bilibili: ' + biliMovies.length + ' movies');
             } catch(e) { console.log('  ❌ Bili error:', e.message); }
             
-            // Combine all movies
+            // Combine
             const allMovies = [...dmMovies, ...biliMovies];
             console.log('📊 Total movies: ' + allMovies.length);
             
-            // Add IMDb ratings (simulated)
+            // Add IMDb ratings
             const moviesWithRatings = allMovies.map(m => {
               let hash = 0;
               for (let i = 0; i < m.title.length; i++) {
@@ -116,12 +151,11 @@ jobs:
               return { ...m, imdbRating };
             });
             
-            // Save to horror/movies.json
             fs.writeFileSync('horror/movies.json', JSON.stringify(moviesWithRatings, null, 2));
             console.log('✅ Saved ' + moviesWithRatings.length + ' movies to horror/movies.json');
           "
           
-      - name: Commit and push movies.json
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
