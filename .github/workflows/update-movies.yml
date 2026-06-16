@@ -21,44 +21,84 @@ jobs:
           fetch-depth: 1
           token: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Fetch DailyMotion movies
+      - name: Fetch DailyMotion movies (2020-2029)
         run: |
-          echo "📡 Fetching DailyMotion: horror full movie (limit 100)..."
-          curl -s "https://api.dailymotion.com/videos?search=horror+full+movie&limit=100&fields=id,title,description,thumbnail_240_url" > dm.json
-          DM_COUNT=$(cat dm.json | jq '.list | length' 2>/dev/null || echo "0")
-          echo "✅ DailyMotion returned: $DM_COUNT movies"
+          echo "📡 Fetching DailyMotion horror movies 2020-2029..."
+          curl -s "https://api.dailymotion.com/videos?search=horror+full+movie+202*&limit=100&fields=id,title,description,thumbnail_240_url" > dm_2020s.json
+          DM_COUNT=$(cat dm_2020s.json | jq '.list | length' 2>/dev/null || echo "0")
+          echo "✅ 2020s: $DM_COUNT movies"
           
-      - name: Fetch Bilibili movies (via RSS)
+      - name: Fetch DailyMotion movies (general horror)
         run: |
-          echo "📡 Fetching Bilibili via RSS: horror full movie..."
+          echo "📡 Fetching DailyMotion general horror movies..."
+          curl -s "https://api.dailymotion.com/videos?search=horror+full+movie&limit=50&fields=id,title,description,thumbnail_240_url" > dm_general.json
+          DM_COUNT=$(cat dm_general.json | jq '.list | length' 2>/dev/null || echo "0")
+          echo "✅ General: $DM_COUNT movies"
           
-          # Try RSSHub (most reliable)
-          curl -s "https://rsshub.app/bilibili/search/horror%20full%20movie" > bili_rss.xml
+      - name: Fetch Bilibili movies (2020-2029)
+        run: |
+          echo "📡 Fetching Bilibili horror movies 2020-2029..."
+          curl -s "https://rsshub.app/bilibili/search/horror%20full%20movie%2020" > bili_2020s.xml 2>/dev/null || echo "RSS failed"
           
-          # Check if RSS worked
-          if grep -q "item" bili_rss.xml 2>/dev/null; then
-            echo "✅ Bilibili RSS returned results"
-            cat bili_rss.xml > bili.xml
-          else
-            echo "⚠️ RSS failed, trying fallback..."
-            # Fallback: Use a different RSS endpoint
-            curl -s "https://api.rss2json.com/v1/api.json?rss_url=https://rsshub.app/bilibili/search/horror%20full%20movie&api_key=zwnbjojjnjhgjyc4f8bcqbe1r5oj3cz4sqayplnw&count=30" > bili_fallback.json
-            echo "✅ Fallback attempted"
-          fi
-          
-      - name: Parse Bilibili results
+      - name: Combine all movies
         run: |
           node -e "
             const fs = require('fs');
             
-            let biliMovies = [];
+            console.log('🔄 Combining movies from all sources...');
             
-            // Try RSS XML first
+            let allMovies = [];
+            let seen = new Set();
+            
+            // Helper to add movies with deduplication
+            function addMovies(movies, source) {
+              if (!movies || movies.length === 0) {
+                console.log('  ⚠️ No movies from', source);
+                return;
+              }
+              let added = 0;
+              movies.forEach(m => {
+                const key = m.title.slice(0, 50) + '|' + m.link;
+                if (!seen.has(key)) {
+                  seen.add(key);
+                  allMovies.push(m);
+                  added++;
+                }
+              });
+              console.log('  📺 ' + source + ': added ' + added + ' new movies');
+            }
+            
+            // Process DailyMotion files
+            const dmFiles = [
+              { file: 'dm_2020s.json', label: 'DM 2020s', year: '2020s' },
+              { file: 'dm_general.json', label: 'DM General', year: 'General' }
+            ];
+            
+            dmFiles.forEach(({file, label, year}) => {
+              try {
+                const data = JSON.parse(fs.readFileSync(file));
+                if (data.list) {
+                  const movies = data.list.map(v => ({
+                    title: v.title || 'Untitled Horror',
+                    link: 'https://www.dailymotion.com/video/' + v.id,
+                    thumbnail: v.thumbnail_240_url || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=DM',
+                    description: (v.description || 'Full horror movie on DailyMotion').slice(0, 150),
+                    source: 'dailymotion',
+                    year: year
+                  }));
+                  addMovies(movies, label);
+                }
+              } catch(e) {
+                console.log('  ❌ ' + label + ' error:', e.message);
+              }
+            });
+            
+            // Process Bilibili RSS
             try {
-              const xml = fs.readFileSync('bili.xml', 'utf8');
-              // Simple XML parsing with regex (works for RSS)
+              const xml = fs.readFileSync('bili_2020s.xml', 'utf8');
               const items = xml.split('<item>');
               if (items.length > 1) {
+                const movies = [];
                 items.slice(1).forEach(item => {
                   const titleMatch = item.match(/<title>(.*?)<\/title>/);
                   const linkMatch = item.match(/<link>(.*?)<\/link>/);
@@ -66,81 +106,54 @@ jobs:
                   const thumbMatch = item.match(/<media:thumbnail url=\"(.*?)\"/);
                   
                   if (titleMatch && linkMatch) {
-                    biliMovies.push({
-                      title: titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/, '$1').trim() || 'Bilibili Horror',
+                    // Check if title contains a year (2020-2029)
+                    const title = titleMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/, '$1').trim() || 'Bilibili Horror';
+                    const yearMatch = title.match(/20[2-9][0-9]/);
+                    
+                    movies.push({
+                      title: title,
                       link: linkMatch[1] || '#',
                       thumbnail: thumbMatch ? thumbMatch[1] : 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
                       description: descMatch ? descMatch[1].replace(/<!\[CDATA\[(.*?)\]\]>/, '$1').slice(0, 100) : 'Full movie on Bilibili',
-                      source: 'bilibili'
+                      source: 'bilibili',
+                      year: yearMatch ? yearMatch[0] : '2020s'
                     });
                   }
                 });
-                console.log('  📺 Bilibili (RSS): ' + biliMovies.length + ' movies');
+                addMovies(movies, 'Bili 2020s');
               }
             } catch(e) {
-              console.log('  📺 RSS parse error:', e.message);
+              console.log('  ❌ Bili error:', e.message);
             }
             
-            // If RSS failed, try JSON fallback
-            if (biliMovies.length === 0) {
-              try {
-                const fallback = JSON.parse(fs.readFileSync('bili_fallback.json', 'utf8'));
-                if (fallback.items && fallback.items.length > 0) {
-                  biliMovies = fallback.items.map(item => ({
-                    title: item.title || 'Bilibili Horror',
-                    link: item.link || '#',
-                    thumbnail: item.thumbnail || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
-                    description: item.description ? item.description.replace(/<[^>]*>/g, '').slice(0, 100) : 'Full movie on Bilibili',
-                    source: 'bilibili'
-                  }));
-                  console.log('  📺 Bilibili (JSON): ' + biliMovies.length + ' movies');
+            console.log('📊 Total unique movies: ' + allMovies.length);
+            
+            // Extract year from title if not already tagged
+            const moviesWithYears = allMovies.map(m => {
+              let year = m.year || 'General';
+              
+              // If year is 'General', try to extract from title
+              if (year === 'General' || year === '2020s') {
+                const yearMatch = m.title.match(/20[2-9][0-9]/);
+                if (yearMatch) {
+                  year = yearMatch[0];
                 }
-              } catch(e) {
-                console.log('  📺 JSON fallback error:', e.message);
               }
-            }
-            
-            // Save Bilibili results
-            fs.writeFileSync('bili_movies.json', JSON.stringify(biliMovies));
-            console.log('✅ Bilibili total: ' + biliMovies.length + ' movies');
-          "
-          
-      - name: Combine all movies
-        run: |
-          node -e "
-            const fs = require('fs');
-            
-            console.log('🔄 Combining movies...');
-            
-            // DailyMotion
-            let dmMovies = [];
-            try {
-              const dm = JSON.parse(fs.readFileSync('dm.json'));
-              if (dm.list) {
-                dmMovies = dm.list.map(v => ({
-                  title: v.title || 'Untitled Horror',
-                  link: 'https://www.dailymotion.com/video/' + v.id,
-                  thumbnail: v.thumbnail_240_url || 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=DM',
-                  description: (v.description || 'Full horror movie on DailyMotion').slice(0, 150),
-                  source: 'dailymotion'
-                }));
-                console.log('  📺 DailyMotion: ' + dmMovies.length + ' movies');
+              
+              // Add year badge to title if not present
+              let displayTitle = m.title;
+              if (year !== 'General' && year !== '2020s' && !m.title.includes(year)) {
+                displayTitle = m.title + ' (' + year + ')';
+              } else if (year === '2020s' && !m.title.match(/20[2-9][0-9]/)) {
+                // Only add decade tag if no specific year
+                displayTitle = m.title + ' [2020s]';
               }
-            } catch(e) { console.log('  ❌ DM error:', e.message); }
-            
-            // Bilibili
-            let biliMovies = [];
-            try {
-              biliMovies = JSON.parse(fs.readFileSync('bili_movies.json'));
-              console.log('  📺 Bilibili: ' + biliMovies.length + ' movies');
-            } catch(e) { console.log('  ❌ Bili error:', e.message); }
-            
-            // Combine
-            const allMovies = [...dmMovies, ...biliMovies];
-            console.log('📊 Total movies: ' + allMovies.length);
+              
+              return { ...m, title: displayTitle, year: year };
+            });
             
             // Add IMDb ratings
-            const moviesWithRatings = allMovies.map(m => {
+            const moviesWithRatings = moviesWithYears.map(m => {
               let hash = 0;
               for (let i = 0; i < m.title.length; i++) {
                 hash = m.title.charCodeAt(i) + ((hash << 5) - hash);
@@ -151,8 +164,26 @@ jobs:
               return { ...m, imdbRating };
             });
             
-            fs.writeFileSync('horror/movies.json', JSON.stringify(moviesWithRatings, null, 2));
-            console.log('✅ Saved ' + moviesWithRatings.length + ' movies to horror/movies.json');
+            // Sort by year (newest first) with 2020s at the top
+            const sorted = moviesWithRatings.sort((a, b) => {
+              const aYear = a.year === 'General' ? 0 : (a.year === '2020s' ? 2020 : parseInt(a.year) || 0);
+              const bYear = b.year === 'General' ? 0 : (b.year === '2020s' ? 2020 : parseInt(b.year) || 0);
+              return bYear - aYear;
+            });
+            
+            fs.writeFileSync('horror/movies.json', JSON.stringify(sorted, null, 2));
+            console.log('✅ Saved ' + sorted.length + ' movies to horror/movies.json');
+            console.log('📊 Year breakdown:');
+            
+            // Count by year
+            const yearCount = {};
+            sorted.forEach(m => {
+              const y = m.year || 'Unknown';
+              yearCount[y] = (yearCount[y] || 0) + 1;
+            });
+            Object.keys(yearCount).sort().forEach(y => {
+              console.log('  ' + y + ': ' + yearCount[y] + ' movies');
+            });
           "
           
       - name: Commit and push
