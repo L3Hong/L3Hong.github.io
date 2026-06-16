@@ -28,24 +28,43 @@ jobs:
           DM_COUNT=$(cat dm.json | jq '.list | length' 2>/dev/null || echo "0")
           echo "✅ DailyMotion returned: $DM_COUNT movies"
           
-      - name: Fetch Bilibili movies (API - same as before)
+      - name: Fetch Bilibili movies (with full browser headers)
         run: |
-          echo "📡 Fetching Bilibili via API (same as working version)..."
+          echo "📡 Fetching Bilibili via API with browser headers..."
           
-          # Use the exact same API call that worked before
-          curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-               "https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=horror%20full%20movie&page=1" > bili.json
+          # Full browser headers to bypass bot protection
+          curl -s \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            -H "Accept: application/json, text/plain, */*" \
+            -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
+            -H "Accept-Encoding: gzip, deflate, br" \
+            -H "Connection: keep-alive" \
+            -H "Referer: https://www.bilibili.com/" \
+            -H "Origin: https://www.bilibili.com" \
+            -H "Sec-Fetch-Dest: empty" \
+            -H "Sec-Fetch-Mode: cors" \
+            -H "Sec-Fetch-Site: same-site" \
+            "https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=horror%20full%20movie&page=1" > bili.json
           
           BILI_COUNT=$(cat bili.json | jq '.data.result | length' 2>/dev/null || echo "0")
           echo "✅ Bilibili returned: $BILI_COUNT movies"
           
-          # Also try with the 202* wildcard
+          # Also fetch 2020s with same headers
           echo "📡 Fetching Bilibili 2020s..."
-          curl -s -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-               "https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=horror%20full%20movie%2020&page=1" > bili_2020s.json
+          curl -s \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            -H "Accept: application/json, text/plain, */*" \
+            -H "Accept-Language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7" \
+            -H "Referer: https://www.bilibili.com/" \
+            -H "Origin: https://www.bilibili.com" \
+            "https://api.bilibili.com/x/web-interface/search/type?search_type=video&keyword=horror%20full%20movie%202020&page=1" > bili_2020.json
           
-          BILI_2020S_COUNT=$(cat bili_2020s.json | jq '.data.result | length' 2>/dev/null || echo "0")
-          echo "✅ Bilibili 2020s returned: $BILI_2020S_COUNT movies"
+          BILI_2020_COUNT=$(cat bili_2020.json | jq '.data.result | length' 2>/dev/null || echo "0")
+          echo "✅ Bilibili 2020 returned: $BILI_2020_COUNT movies"
+          
+          # Show what we got (for debugging)
+          echo "📊 Bilibili response preview:"
+          cat bili.json | jq '.data.result[0:2] | .[] | {title: .title, bvid: .bvid}' 2>/dev/null || echo "No results"
           
       - name: Combine all movies
         run: |
@@ -57,7 +76,6 @@ jobs:
             let allMovies = [];
             let seen = new Set();
             
-            // Helper to add movies with deduplication
             function addMovies(movies, source) {
               if (!movies || movies.length === 0) {
                 console.log('  ⚠️ No movies from', source);
@@ -75,7 +93,7 @@ jobs:
               console.log('  📺 ' + source + ': added ' + added + ' new movies');
             }
             
-            // Process DailyMotion
+            // DailyMotion
             try {
               const dm = JSON.parse(fs.readFileSync('dm.json'));
               if (dm.list) {
@@ -92,9 +110,10 @@ jobs:
               console.log('  ❌ DailyMotion error:', e.message);
             }
             
-            // Process Bilibili (main)
+            // Bilibili (main)
             try {
               const bili = JSON.parse(fs.readFileSync('bili.json'));
+              console.log('  📊 Bilibili response code:', bili.code);
               if (bili.code === 0 && bili.data && bili.data.result) {
                 const movies = bili.data.result.map(v => ({
                   title: v.title ? v.title.replace(/<[^>]*>/g, '').trim() : 'Bilibili Horror',
@@ -105,51 +124,35 @@ jobs:
                 }));
                 addMovies(movies, 'Bilibili');
               } else {
-                console.log('  ⚠️ Bilibili API returned:', bili.code, bili.message || '');
+                console.log('  ⚠️ Bilibili API returned code:', bili.code, 'message:', bili.message || '');
+                // Show full response for debugging
+                console.log('  📄 Full response:', JSON.stringify(bili).slice(0, 500));
               }
             } catch(e) {
               console.log('  ❌ Bilibili error:', e.message);
             }
             
-            // Process Bilibili 2020s
+            // Bilibili 2020
             try {
-              const bili2020 = JSON.parse(fs.readFileSync('bili_2020s.json'));
+              const bili2020 = JSON.parse(fs.readFileSync('bili_2020.json'));
               if (bili2020.code === 0 && bili2020.data && bili2020.data.result) {
                 const movies = bili2020.data.result.map(v => ({
-                  title: v.title ? v.title.replace(/<[^>]*>/g, '').trim() + ' [2020s]' : 'Bilibili Horror',
+                  title: v.title ? v.title.replace(/<[^>]*>/g, '').trim() + ' [2020]' : 'Bilibili Horror',
                   link: 'https://www.bilibili.com/video/' + v.bvid,
                   thumbnail: v.pic ? (v.pic.startsWith('//') ? 'https:' + v.pic : v.pic) : 'https://via.placeholder.com/320x180/1f262e/6b7b8b?text=Bili',
                   description: (v.description || 'Full movie on Bilibili').slice(0, 100),
                   source: 'bilibili'
                 }));
-                addMovies(movies, 'Bilibili 2020s');
+                addMovies(movies, 'Bilibili 2020');
               }
             } catch(e) {
-              console.log('  ❌ Bilibili 2020s error:', e.message);
+              console.log('  ❌ Bilibili 2020 error:', e.message);
             }
             
             console.log('📊 Total unique movies: ' + allMovies.length);
             
-            // Extract year from title
-            const moviesWithYears = allMovies.map(m => {
-              let displayTitle = m.title;
-              const yearMatch = m.title.match(/20[2-9][0-9]/);
-              if (yearMatch && !m.title.includes('[')) {
-                // Already has year, keep it
-              } else if (yearMatch) {
-                // Has year but maybe not formatted
-              } else {
-                // Try to find year in description
-                const descYear = m.description.match(/20[2-9][0-9]/);
-                if (descYear && !displayTitle.includes(descYear[0])) {
-                  displayTitle = displayTitle + ' (' + descYear[0] + ')';
-                }
-              }
-              return { ...m, title: displayTitle };
-            });
-            
             // Add IMDb ratings
-            const moviesWithRatings = moviesWithYears.map(m => {
+            const moviesWithRatings = allMovies.map(m => {
               let hash = 0;
               for (let i = 0; i < m.title.length; i++) {
                 hash = m.title.charCodeAt(i) + ((hash << 5) - hash);
@@ -163,7 +166,7 @@ jobs:
             fs.writeFileSync('horror/movies.json', JSON.stringify(moviesWithRatings, null, 2));
             console.log('✅ Saved ' + moviesWithRatings.length + ' movies to horror/movies.json');
             
-            // Show source breakdown
+            // Source breakdown
             const sourceCount = {};
             moviesWithRatings.forEach(m => {
               sourceCount[m.source] = (sourceCount[m.source] || 0) + 1;
