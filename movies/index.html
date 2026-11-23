@@ -43,6 +43,21 @@ main{padding:28px 5vw 60px;max-width:1300px;margin:auto}
 .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 small.credit{display:block;margin-top:40px;color:var(--mute);font-size:13px}
 @media(max-width:640px){.hero{grid-template-columns:1fr}.hero img.po{max-width:200px}form.s{margin-left:0;width:100%}form.s input{flex:1}}
+.ghost{background:var(--panel);color:var(--tx);border:1px solid var(--line)}
+.filters{margin-top:4px}
+.pager{display:flex;gap:10px;justify-content:center;margin-top:28px}
+.rm{margin-top:6px;width:100%;font-size:14px}
+.player{position:relative;background:#000;border-radius:10px;overflow:hidden}
+.player video{width:100%;display:block;aspect-ratio:16/9;max-height:80vh;background:#000}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 10px;background:#0b0c12}
+.ctl input[type=range]{flex:1;min-width:120px;padding:0;accent-color:var(--ac)}
+.ctl button,.ctl select{padding:6px 10px}
+.player:fullscreen{display:flex;flex-direction:column;justify-content:center}
+.player:fullscreen video{max-height:calc(100vh - 64px)}
+.card .p{transition:transform .15s}
+.card:focus-visible .p{transform:scale(1.06);border-color:var(--ac)}
+@media(prefers-reduced-motion:reduce){.card .p{transition:none}}
+@media(min-width:1600px){body{font-size:19px}.grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}}
 </style>
 </head>
 <body>
@@ -58,16 +73,25 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const store={get:k=>{try{return localStorage.getItem(k)}catch{return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}}};
 let KEY=store.get('tmdb')||'', REGION=store.get('region')||'AU';
 const IMG='https://image.tmdb.org/t/p/';
-const tab=P.get('tab')==='free'||P.get('ia')?'free':'discover';
+const tab=P.get('tab')==='free'||P.get('ia')?'free':P.get('tab')==='list'?'list':'discover';
+let playerKey=null;
+const WL={all:()=>{try{return JSON.parse(store.get('wl')||'[]')}catch{return[]}},
+  has:k=>WL.all().some(x=>x.k===k),
+  toggle:it=>{const a=WL.all(),has=a.some(x=>x.k===it.k);store.set('wl',JSON.stringify(has?a.filter(x=>x.k!==it.k):[it,...a]));return !has}};
+function bindWL(it){
+  const b=$('#wl');if(!b)return;
+  const paint=()=>{b.textContent=WL.has(it.k)?'Saved – click to remove':'Save to watchlist'};
+  paint();b.onclick=()=>{WL.toggle(it);paint()};
+}
 
-$('#nav').innerHTML=`<a href="./" class="${tab==='discover'?'on':''}">Discover</a><a href="?tab=free" class="${tab==='free'?'on':''}">Free films</a>`;
+$('#nav').innerHTML=`<a href="./" class="${tab==='discover'?'on':''}">Discover</a><a href="?tab=free" class="${tab==='free'?'on':''}">Free films</a><a href="?tab=list" class="${tab==='list'?'on':''}">Watchlist</a>`;
 $('#q').value=P.get('q')||'';
 $('#sf').onsubmit=e=>{e.preventDefault();const q=$('#q').value.trim();location.search=(tab==='free'?'?tab=free&':'?')+(q?'q='+encodeURIComponent(q):'')};
 
 async function tmdb(path,params={}){
   const u=new URL('https://api.themoviedb.org/3'+path), h={};
   if(KEY.length>40)h.Authorization='Bearer '+KEY; else u.searchParams.set('api_key',KEY);
-  for(const k in params)u.searchParams.set(k,params[k]);
+  for(const k in params)if(params[k]!==''&&params[k]!=null)u.searchParams.set(k,params[k]);
   const r=await fetch(u,{headers:h});
   if(!r.ok)throw new Error(r.status===401?'bad-key':'TMDB error '+r.status);
   return r.json();
@@ -97,10 +121,24 @@ function freeCards(list){
 
 async function discover(){
   if(!KEY)return keyScreen();
-  const q=P.get('q');
+  const q=P.get('q'), pg=+(P.get('page')||1);
   app.innerHTML='<p class="mute">Loading…</p>';
-  const d=q?await tmdb('/search/movie',{query:q,include_adult:'false'}):await tmdb('/trending/movie/week');
-  app.innerHTML=`<h2>${q?`Results for “${esc(q)}”`:'Trending this week'}</h2>${d.results.length?cards(d.results):'<p class="mute">No movies found. Try a different title.</p>'}
+  let d,bar='',filtered=false;
+  if(q){d=await tmdb('/search/movie',{query:q,include_adult:'false',page:pg})}
+  else{
+    const g=P.get('g')||'',y=P.get('y')||'',r=P.get('r')||'',s=P.get('s')||'popularity.desc';
+    filtered=!!(g||y||r||s!=='popularity.desc');
+    const genres=(await tmdb('/genre/movie/list')).genres;
+    const sel=(n,label,opts,cur)=>`<select name="${n}" aria-label="${label}">${opts.map(([v,l])=>`<option value="${v}"${String(cur)===String(v)?' selected':''}>${l}</option>`).join('')}</select>`;
+    bar=`<form class="row filters" method="get">
+      ${sel('g','Genre',[['','Any genre'],...genres.map(x=>[x.id,x.name])],g)}
+      <input name="y" type="number" min="1900" max="${new Date().getFullYear()+1}" placeholder="Year" value="${esc(y)}" aria-label="Release year" style="width:100px">
+      ${sel('r','Minimum rating',[['','Any rating'],['6','6+'],['7','7+'],['8','8+']],r)}
+      ${sel('s','Sort by',[['popularity.desc','Most popular'],['vote_average.desc','Top rated'],['primary_release_date.desc','Newest']],s)}
+      <button>Apply filters</button></form>`;
+    d=filtered?await tmdb('/discover/movie',{with_genres:g,primary_release_year:y,'vote_average.gte':r,'vote_count.gte':'200',sort_by:s,include_adult:'false',page:pg}):await tmdb('/trending/movie/week',{page:pg});
+  }
+  app.innerHTML=`${bar}<h2 style="margin-top:20px">${q?`Results for “${esc(q)}”`:filtered?'Matching movies':'Trending this week'}</h2>${d.results.length?cards(d.results)+pager(d,pg):'<p class="mute">No movies found. Try different filters or a different title.</p>'}
   <small class="credit">Movie data from TMDB. Streaming availability provided by JustWatch via TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.</small>`;
 }
 
@@ -117,6 +155,7 @@ async function movie(id){
     <div class="chips"><span class="chip">${(m.release_date||'').slice(0,4)}</span>${m.runtime?`<span class="chip">${m.runtime} min</span>`:''}<span class="chip">★ ${m.vote_average.toFixed(1)}</span>${m.genres.map(g=>`<span class="chip">${esc(g.name)}</span>`).join('')}</div>
     <p>${esc(m.overview)}</p>
     <p class="mute">Starring ${esc(m.credits.cast.slice(0,6).map(c=>c.name).join(', '))}</p>
+    <div class="row"><button id="wl" class="ghost"></button></div>
     <div class="box"><div class="row" style="justify-content:space-between"><h3>Where to watch</h3><label class="mute">Region <select id="rg">${regions}</select></label></div>
      ${wp?logos(wp.flatrate,'Stream')+logos(wp.rent,'Rent')+logos(wp.buy,'Buy')+(wp.link?`<a class="btn" target="_blank" rel="noopener" href="${esc(wp.link)}">See all options</a>`:''):`<p class="mute">Not listed on any service in ${REGION} right now.</p>`}
     </div>
@@ -125,6 +164,7 @@ async function movie(id){
    ${trailer?`<div class="box"><h3>Trailer</h3><iframe class="frame" allowfullscreen title="Trailer" src="https://www.youtube-nocookie.com/embed/${esc(trailer.key)}"></iframe></div>`:''}
    <small class="credit">Movie data from TMDB. Streaming availability provided by JustWatch via TMDB.</small>`;
   $('#rg').onchange=e=>{store.set('region',e.target.value);location.reload()};
+  bindWL({k:'m'+m.id,href:'?id='+m.id,title:m.title,img:m.poster_path?IMG+'w342'+m.poster_path:'',year:(m.release_date||'').slice(0,4)});
   // Possible free public-domain copies
   try{
     const hits=(await archive(m.title,3)).filter(f=>!f.year||Math.abs(+f.year-+(m.release_date||'0').slice(0,4))<=1);
@@ -134,19 +174,101 @@ async function movie(id){
 
 async function free(){
   const ia=P.get('ia');
-  if(ia){
-    app.innerHTML=`<h2>Now playing</h2><div class="box"><iframe class="frame" allowfullscreen title="Film player" src="https://archive.org/embed/${encodeURIComponent(ia)}"></iframe>
-    <p class="mute"><a style="text-decoration:underline" href="https://archive.org/details/${encodeURIComponent(ia)}" target="_blank" rel="noopener">View on the Internet Archive</a> for details and licence information.</p></div>`;
-    return;
-  }
+  if(ia)return player(ia);
   const q=P.get('q'); app.innerHTML='<p class="mute">Loading…</p>';
   const list=await archive(q,48);
   app.innerHTML=`<h2>${q?`Free films matching “${esc(q)}”`:'Free films'}</h2><p class="mute">Feature films from the Internet Archive, mostly public-domain classics. Check each film’s page for its licence.</p>${list.length?freeCards(list):'<p class="mute">No free films found for that search.</p>'}`;
 }
 
+function pager(d,pg){
+  const link=n=>{const u=new URLSearchParams(P);u.set('page',n);return '?'+u};
+  return `<div class="pager">${pg>1?`<a class="btn ghost" href="${link(pg-1)}">Previous</a>`:''}${pg<Math.min(d.total_pages,20)?`<a class="btn" href="${link(pg+1)}">Next page</a>`:''}</div>`;
+}
+
+function list(){
+  const a=WL.all();
+  app.innerHTML='<h2>Watchlist</h2>'+(a.length?`<div class="grid">${a.map(x=>`<div><a class="card" href="${esc(x.href)}"><div class="p">${x.img?`<img loading="lazy" alt="" src="${esc(x.img)}">`:''}</div><b>${esc(x.title)}</b><span>${esc(x.year||'')}</span></a><button class="ghost rm" data-k="${esc(x.k)}">Remove</button></div>`).join('')}</div><p class="mute">Your watchlist is saved in this browser only.</p>`:'<p class="mute">Nothing saved yet. Open a film and choose Save to watchlist.</p>');
+  app.onclick=e=>{const b=e.target.closest('.rm');if(b){store.set('wl',JSON.stringify(WL.all().filter(x=>x.k!==b.dataset.k)));list()}};
+}
+
+async function player(ia){
+  app.innerHTML='<p class="mute">Loading player…</p>';
+  let meta={};try{meta=await (await fetch('https://archive.org/metadata/'+encodeURIComponent(ia))).json()}catch{}
+  const files=meta.files||[], title=(meta.metadata&&meta.metadata.title)||ia, year=(meta.metadata&&meta.metadata.year)||'';
+  const vf=files.find(f=>f.format==='h.264')||files.find(f=>f.format==='512Kb MPEG4')||files.find(f=>/\.mp4$/i.test(f.name));
+  const subs=files.filter(f=>/\.(vtt|srt)$/i.test(f.name));
+  const dl=n=>'https://archive.org/download/'+encodeURIComponent(ia)+'/'+n.split('/').map(encodeURIComponent).join('/');
+  const embed=()=>{playerKey=null;$('#stage').innerHTML=`<iframe class="frame" allowfullscreen title="Film player" src="https://archive.org/embed/${encodeURIComponent(ia)}"></iframe>`};
+  app.innerHTML=`<h2>${esc(title)}</h2><div id="stage" style="margin-top:16px">${vf?`<div class="player" id="pl" tabindex="0" aria-label="Video player">
+    <video id="v" preload="metadata" playsinline src="${dl(vf.name)}"></video>
+    <div class="ctl">
+      <button id="pp">Play</button><input id="sk" type="range" min="0" max="1000" value="0" aria-label="Seek"><span id="tm" class="mute">0:00</span>
+      <button id="mu" class="ghost">Mute</button>
+      <select id="sp" aria-label="Speed">${[0.75,1,1.25,1.5,2].map(s=>`<option value="${s}"${s===1?' selected':''}>${s}×</option>`).join('')}</select>
+      <select id="cc" aria-label="Subtitles"><option value="">Subtitles off</option>${subs.map((f,i)=>`<option value="${i}">${esc(f.name.replace(/\.(vtt|srt)$/i,''))}</option>`).join('')}</select>
+      <button id="fs" class="ghost">Full screen</button>
+    </div></div>`:''}</div>
+    <div class="row" style="margin-top:14px"><button id="wl" class="ghost"></button>
+      <label class="btn ghost" style="cursor:pointer">Load subtitle file<input id="subfile" type="file" accept=".srt,.vtt" hidden></label>
+      <a class="mute" style="text-decoration:underline" href="https://archive.org/details/${encodeURIComponent(ia)}" target="_blank" rel="noopener">Licence and details on the Internet Archive</a></div>
+    <p class="mute">Keys: Space or Enter play/pause, ←/→ skip 10 s, M mute, C subtitles, F full screen.</p>`;
+  bindWL({k:'f'+ia,href:'?ia='+encodeURIComponent(ia),title,img:'https://archive.org/services/img/'+encodeURIComponent(ia),year});
+  if(!vf)return embed();
+  const v=$('#v'),pl=$('#pl'),fmt=t=>{t=Math.floor(t||0);const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=t%60;return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(s).padStart(2,'0')};
+  const toggle=()=>v.paused?v.play():v.pause(), fs=()=>document.fullscreenElement?document.exitFullscreen():pl.requestFullscreen&&pl.requestFullscreen();
+  v.onerror=embed;
+  v.onplay=v.onpause=()=>{$('#pp').textContent=v.paused?'Play':'Pause'};
+  v.ontimeupdate=()=>{if(v.duration)$('#sk').value=v.currentTime/v.duration*1000;$('#tm').textContent=fmt(v.currentTime)+' / '+fmt(v.duration)};
+  $('#sk').oninput=e=>{if(v.duration)v.currentTime=e.target.value/1000*v.duration};
+  $('#pp').onclick=toggle; v.onclick=toggle; $('#fs').onclick=fs;
+  $('#mu').onclick=()=>{v.muted=!v.muted;$('#mu').textContent=v.muted?'Unmute':'Mute'};
+  $('#sp').onchange=e=>{v.playbackRate=+e.target.value};
+  const setSub=(text,label)=>{
+    v.querySelectorAll('track').forEach(t=>t.remove());
+    if(!text)return;
+    text=text.replace(/^\uFEFF/,'');
+    if(!/^WEBVTT/.test(text.trim()))text='WEBVTT\n\n'+text.replace(/\r/g,'').replace(/(\d+:\d\d:\d\d),(\d{3})/g,'$1.$2');
+    const t=document.createElement('track');t.kind='subtitles';t.label=label;t.default=true;
+    t.src=URL.createObjectURL(new Blob([text],{type:'text/vtt'}));v.appendChild(t);t.track.mode='showing';
+  };
+  $('#cc').onchange=async e=>{
+    if(e.target.value==='')return setSub('');
+    try{const r=await fetch(dl(subs[+e.target.value].name));if(!r.ok)throw 0;setSub(await r.text(),'Subtitles')}
+    catch{e.target.value='';alert('Couldn’t load that subtitle file. Use “Load subtitle file” to add your own .srt or .vtt.')}
+  };
+  $('#subfile').onchange=async e=>{const f=e.target.files[0];if(f)setSub(await f.text(),f.name)};
+  const cycle=()=>{const c=$('#cc');c.selectedIndex=(c.selectedIndex+1)%c.options.length;c.onchange({target:c})};
+  playerKey=e=>{
+    const t=e.target,k=e.key;
+    if(t.tagName==='SELECT'||(t.tagName==='INPUT'&&t.type!=='range'))return false;
+    if(k==='f'){fs();return true}
+    if(k==='c'){cycle();return true}
+    if(k==='m'){$('#mu').click();return true}
+    if(k==='k'||(k===' '&&!t.closest('.ctl'))||(k==='Enter'&&t===pl)){toggle();e.preventDefault();return true}
+    if((k==='ArrowLeft'||k==='ArrowRight')&&(t===pl||t===document.body)){v.currentTime+=k==='ArrowLeft'?-10:10;e.preventDefault();return true}
+    return false;
+  };
+  pl.focus();
+}
+
+// TV / remote navigation: arrow keys move focus to the nearest item in that direction
+document.addEventListener('keydown',e=>{
+  if(playerKey&&playerKey(e))return;
+  const a=document.activeElement, dir={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
+  const typing=a&&(a.tagName==='SELECT'||(a.tagName==='INPUT'&&a.type!=='range'));
+  if(e.key==='Backspace'&&!typing&&history.length>1){history.back();return}
+  if(!dir||typing||(a&&a.type==='range'&&!dir[1]))return;
+  const els=[...document.querySelectorAll('a[href],button,input:not([type=hidden]):not([type=file]),select,[tabindex="0"]')].filter(x=>x.offsetParent&&!x.disabled);
+  if(!a||a===document.body){if(els[0]){els[0].focus();e.preventDefault()}return}
+  const r=a.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let best=null,bd=1e9;
+  for(const x of els){if(x===a)continue;const b=x.getBoundingClientRect(),dx=b.left+b.width/2-cx,dy=b.top+b.height/2-cy,along=dx*dir[0]+dy*dir[1];
+    if(along<=4)continue;const d=along+Math.abs(dir[0]?dy:dx)*2;if(d<bd){bd=d;best=x}}
+  if(best){best.focus();best.scrollIntoView({block:'center'});e.preventDefault()}
+});
+
 (async()=>{
   try{
-    if(P.get('id'))await movie(P.get('id')); else if(tab==='free')await free(); else await discover();
+    if(P.get('id'))await movie(P.get('id')); else if(tab==='free')await free(); else if(tab==='list')list(); else await discover();
   }catch(e){
     if(e.message==='bad-key'){store.set('tmdb','');KEY='';keyScreen('TMDB rejected that key. Check it and paste it again.')}
     else app.innerHTML=`<div class="err"><b>Something went wrong.</b><br>${esc(e.message)}. Check your connection and reload.</div>`;
